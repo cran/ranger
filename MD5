@@ -1,4 +1,4 @@
-91063175cd16152ca324138b17922baa *DESCRIPTION
+727c229941386f2555591df428c6c1a4 *DESCRIPTION
 3ec8a25c827f2854eba154953a35002e *NAMESPACE
 04ebfe0fd57e4dd20001b825165113db *R/RcppExports.R
 7ae72941fb988cd76d4697dca7d7d295 *R/importance.R
@@ -32,13 +32,13 @@ b8b1422784a231b2f9a51cd7391a2583 *src/DataDouble.h
 8fe4782312d993d97b6da3cf280dbe1e *src/DataFloat.h
 f037178cd434ba26cd7877bca331f136 *src/Forest.cpp
 7e0579070a195ff40288a9de8b0b8e1f *src/Forest.h
-7b02fc801057cf35b25dabfd34580843 *src/ForestClassification.cpp
+07708816b1a033d362f5de50b2a48561 *src/ForestClassification.cpp
 7d2fb45c8814e2a59dab0f16d7d960e6 *src/ForestClassification.h
-9a3ee27a79b731719d2e7de953d3c8ac *src/ForestProbability.cpp
+330766682d4bc31de8f27025a1464eda *src/ForestProbability.cpp
 a3fd957b1ce69893275c85362aaac748 *src/ForestProbability.h
-af2c76706b3d350e1d9b33b8080ac671 *src/ForestRegression.cpp
+d34ac6ce5c7ea6477192f0c0ff34de10 *src/ForestRegression.cpp
 2f1dd616873482d4afa6b04b4d9199d4 *src/ForestRegression.h
-8372dc275470b6ba354dec920a7c29a0 *src/ForestSurvival.cpp
+4af7ea7fb0978ee061b4e441e0fb1d7b *src/ForestSurvival.cpp
 9ee2f53961fe9ebc716327eed25ad01d *src/ForestSurvival.h
 6832ca2b9ba11ae1f20fa94b3944ccbe *src/Makevars
 1ef22f1ba49645546688b34c32b1414a *src/Makevars.win
@@ -57,4 +57,4 @@ cfd5cba3d6593bbb7416fa5160abaf94 *src/TreeSurvival.h
 2da44502f0617c297be719173ab08d08 *src/rangerCpp.cpp
 555281c0b41a3cb2631d67c2723290d3 *src/utility.cpp
 03bd3d955bd12f1a891b5be8c0ef1283 *src/utility.h
-2a8d871d153e18e341a233949adece2f *src/version.h
+8a836e07f49363514e25b4312ccda1dd *src/version.h
