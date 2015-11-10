@@ -64,7 +64,7 @@ Object of class \code{ranger} with elements
       \code{variable.importance}     \tab Variable importance for each independent variable. \cr
       \code{prediction.error}   \tab Overall out of bag prediction error. For classification this is the fraction of missclassified samples, for regression the mean squared error and for survival one minus Harrell's c-index. \cr
       \code{r.squared}   \tab R squared. Also called explained variance or coefficient of determination (regression only). \cr
-      \code{classification.table} \tab Contingency table for classes and predictions based on out of bag samples (classification only). \cr
+      \code{confusion.matrix} \tab Contingency table for classes and predictions based on out of bag samples (classification only). \cr
       \code{unique.death.times} \tab Unique death times (survival only). \cr
       \code{chf} \tab Estimated cumulative hazard function for each sample (survival only). \cr
       \code{survival} \tab Estimated survival function for each sample (survival only). \cr
@@ -111,6 +111,8 @@ All SNPs in the \code{GenABEL} object will be used for splitting.
 To use only the SNPs without sex or other covariates from the phenotype file, use \code{0} on the right hand side of the formula.
 Note that missing values are treated as an extra category while splitting.
 
+See \url{https://github.com/mnwright/ranger} for the development version.
+
 Notes:
 \itemize{
  \item Multithreading is currently not supported for Microsoft Windows platforms.
@@ -156,7 +158,9 @@ ranger(trait ~ ., data = dat.gwaa)
 Marvin N. Wright
 }
 \references{
-Breiman, L. (2001). Random forests. Mach Learn, 45(1), 5-32. \cr
+Wright, M. N., & Ziegler, A. (2015). ranger: A fast implementation of random forests for high dimensional data in C++ and R. arXiv preprint \url{http://arxiv.org/abs/1508.04409}.
+
+  Breiman, L. (2001). Random forests. Mach Learn, 45(1), 5-32. \cr
   Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat, 841-860. \cr
   Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med, 51(1), 74.
 }

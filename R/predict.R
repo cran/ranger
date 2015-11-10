@@ -54,7 +54,7 @@ predict.ranger.forest <- function(object, data, seed = NULL, num.threads = NULL,
                                   verbose = TRUE, ...) {
   
   ## GenABEL GWA data
-  if (class(data) == "gwaa.data") {
+  if ("gwaa.data" %in% class(data)) {
     snp.names <- snp.names(data)
     sparse.data <- data@gtdata@gtps@.Data
     data <- data@phdata[, -1]
@@ -63,7 +63,7 @@ predict.ranger.forest <- function(object, data, seed = NULL, num.threads = NULL,
   } else {
     sparse.data <- as.matrix(0)
     gwa.mode <- FALSE
-    variable.names <- names(data)
+    variable.names <- colnames(data)
   }
 
   ## Check forest argument
@@ -82,20 +82,44 @@ predict.ranger.forest <- function(object, data, seed = NULL, num.threads = NULL,
                                          is.null(forest$chf) | is.null(forest$unique.death.times))) {
     stop("Error: Invalid forest object.")
   }
-  if (forest$treetype == "Classification" & (is.null(forest$levels))) {
-    stop("Error: Invalid forest object.")
-  }
-
-  if (sum(!(forest$independent.variable.names %in% variable.names)) > 0) {
-    stop("Error: One or more independent variables not found in data.")
-  }
-  data.selected <- subset(data, select = forest$independent.variable.names)
+  
+  ## If alternative interface used, don't subset data
   if (forest$treetype == "Survival") {
-    data.final <- data.matrix(cbind(0, 0, data.selected))
-    variable.names <- c("time", "status", forest$independent.variable.names)
+    if (forest$dependent.varID > 0 & forest$status.varID > 1) {
+      if (!is.matrix(data)) {
+        ## Recode characters
+        char.columns <- sapply(data, is.character)
+        data[char.columns] <- lapply(data[char.columns], factor)
+      }
+      data.final <- data.matrix(data)
+    } else {
+      data.selected <- subset(data, select = forest$independent.variable.names)
+      if (!is.matrix(data.selected)) {
+        ## Recode characters
+        char.columns <- sapply(data.selected, is.character)
+        data.selected[char.columns] <- lapply(data.selected[char.columns], factor)
+      }
+      data.final <- data.matrix(cbind(0, 0, data.selected))
+      variable.names <- c("time", "status", forest$independent.variable.names)
+    }
   } else {
-    data.final <- data.matrix(cbind(0, data.selected))
-    variable.names <- c("dependent", forest$independent.variable.names)
+    if (forest$dependent.varID > 0) {
+      if (!is.matrix(data)) {
+        ## Recode characters
+        char.columns <- sapply(data, is.character)
+        data[char.columns] <- lapply(data[char.columns], factor)
+      }
+      data.final <- data.matrix(data)
+    } else {
+      data.selected <- subset(data, select = forest$independent.variable.names)
+      if (!is.matrix(data.selected)) {
+        ## Recode characters
+        char.columns <- sapply(data.selected, is.character)
+        data.selected[char.columns] <- lapply(data.selected[char.columns], factor)
+      }
+      data.final <- data.matrix(cbind(0, data.selected))
+      variable.names <- c("dependent", forest$independent.variable.names)
+    }
   }
 
   ## If gwa mode, add snp variable names
@@ -105,6 +129,10 @@ predict.ranger.forest <- function(object, data, seed = NULL, num.threads = NULL,
 
   if (any(is.na(data.final))) {
     stop("Missing values in data.")
+  }
+  
+  if (sum(!(forest$independent.variable.names %in% variable.names)) > 0) {
+    stop("Error: One or more independent variables not found in data.")
   }
 
   ## Num threads
@@ -117,7 +145,7 @@ predict.ranger.forest <- function(object, data, seed = NULL, num.threads = NULL,
 
   ## Seed
   if (is.null(seed)) {
-    seed <- 0
+    seed <- runif(1 , 0, .Machine$integer.max)
   }
 
   if (forest$treetype == "Classification") {
@@ -160,7 +188,7 @@ predict.ranger.forest <- function(object, data, seed = NULL, num.threads = NULL,
                       unordered.factor.variables, use.unordered.factor.variables, save.memory, splitrule)
 
   if (length(result) == 0) {
-    stop("Internal error.")
+    stop("User interrupt or internal error.")
   }
 
   ## Prepare results
@@ -168,7 +196,7 @@ predict.ranger.forest <- function(object, data, seed = NULL, num.threads = NULL,
   result$num.samples <- nrow(data.final)
   result$treetype <- forest$treetype
 
-  if (forest$treetype == "Classification") {
+  if (forest$treetype == "Classification" & !is.null(forest$levels)) {
     result$predictions <- factor(result$predictions, levels = 1:length(forest$levels),
                                  labels = forest$levels)
   } else if (forest$treetype == "Survival") {
@@ -176,8 +204,13 @@ predict.ranger.forest <- function(object, data, seed = NULL, num.threads = NULL,
     result$chf <- result$predictions
     result$predictions <- NULL
     result$survival <- exp(-result$chf)
-  } else if (forest$treetype == "Probability estimation") {
-    colnames(result$predictions) <- forest$levels
+  } else if (forest$treetype == "Probability estimation" & !is.null(forest$levels)) {
+    if (is.matrix(result$predictions)) {
+      colnames(result$predictions) <- forest$levels
+    } else {
+      names(result$predictions) <- forest$levels
+    }
+    
   }
 
   class(result) <- "ranger.prediction"

@@ -58,6 +58,8 @@
 ##' To use only the SNPs without sex or other covariates from the phenotype file, use \code{0} on the right hand side of the formula. 
 ##' Note that missing values are treated as an extra category while splitting.
 ##' 
+##' See \url{https://github.com/mnwright/ranger} for the development version.
+##' 
 ##' Notes:
 ##' \itemize{
 ##'  \item Multithreading is currently not supported for Microsoft Windows platforms.
@@ -92,7 +94,7 @@
 ##'       \code{variable.importance}     \tab Variable importance for each independent variable. \cr
 ##'       \code{prediction.error}   \tab Overall out of bag prediction error. For classification this is the fraction of missclassified samples, for regression the mean squared error and for survival one minus Harrell's c-index. \cr
 ##'       \code{r.squared}   \tab R squared. Also called explained variance or coefficient of determination (regression only). \cr
-##'       \code{classification.table} \tab Contingency table for classes and predictions based on out of bag samples (classification only). \cr
+##'       \code{confusion.matrix} \tab Contingency table for classes and predictions based on out of bag samples (classification only). \cr
 ##'       \code{unique.death.times} \tab Unique death times (survival only). \cr
 ##'       \code{chf} \tab Estimated cumulative hazard function for each sample (survival only). \cr
 ##'       \code{survival} \tab Estimated survival function for each sample (survival only). \cr
@@ -143,6 +145,8 @@
 ##'
 ##' @author Marvin N. Wright
 ##' @references
+##'   Wright, M. N., & Ziegler, A. (2015). ranger: A fast implementation of random forests for high dimensional data in C++ and R. arXiv preprint \url{http://arxiv.org/abs/1508.04409}.
+##' 
 ##'   Breiman, L. (2001). Random forests. Mach Learn, 45(1), 5-32. \cr
 ##'   Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat, 841-860. \cr
 ##'   Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med, 51(1), 74.
@@ -164,7 +168,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                    classification = NULL) {
   
   ## GenABEL GWA data
-  if (class(data) == "gwaa.data") {
+  if ("gwaa.data" %in% class(data)) {
     snp.names <- data@gtdata@snpnames
     sparse.data <- data@gtdata@gtps@.Data
     data <- data@phdata
@@ -248,6 +252,9 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     data.final <- data.selected
   }
   if (!is.matrix(data.selected)) {
+    ## Recode characters as factors and create matrix
+    char.columns <- sapply(data.final, is.character)
+    data.final[char.columns] <- lapply(data.final[char.columns], factor)
     data.final <- data.matrix(data.final)
   }
   variable.names <- colnames(data.final)
@@ -389,7 +396,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                       save.memory, splitrule)
   
   if (length(result) == 0) {
-    stop("Internal error.")
+    stop("User interrupt or internal error.")
   }
   
   ## Prepare results
@@ -402,7 +409,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   if (treetype == 1 & is.factor(response)) {
     result$predictions <- factor(result$predictions, levels = 1:nlevels(response),
                                  labels = levels(response))
-    result$classification.table <- table(result$predictions, unlist(data[, dependent.variable.name]), dnn = c("predicted", "true"))
+    result$confusion.matrix <- table(unlist(data[, dependent.variable.name]), result$predictions, dnn = c("true", "predicted"))
   } else if (treetype == 5) {
     result$chf <- result$predictions
     result$predictions <- NULL
