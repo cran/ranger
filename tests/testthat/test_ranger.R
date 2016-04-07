@@ -50,31 +50,31 @@ test_that("unique death times in survival result is right", {
 
 test_that("importance measures work", {
   rg.imp <- ranger(Species ~ ., data = iris, verbose = FALSE, write.forest = TRUE,
-                    importance = "impurity")
+                   importance = "impurity")
   expect_that(rg.imp$variable.importance, is_a("numeric"))
   rg.imp <- ranger(Species ~ ., data = iris, verbose = FALSE, write.forest = TRUE,
-                    importance = "permutation")
+                   importance = "permutation")
   expect_that(rg.imp$variable.importance, is_a("numeric"))
   rg.imp <- ranger(Species ~ ., data = iris, verbose = FALSE, write.forest = TRUE,
-                    importance = "permutation", scale.permutation.importance = TRUE)
+                   importance = "permutation", scale.permutation.importance = TRUE)
   expect_that(rg.imp$variable.importance, is_a("numeric"))
 })
 
 test_that("gini importance is larger than 1", {
   rg.imp <- ranger(Species ~ ., data = iris, verbose = FALSE, write.forest = TRUE,
-                    importance = "impurity")
+                   importance = "impurity")
   expect_that(rg.imp$variable.importance[1], is_more_than(1))
 })
 
 test_that("unscaled importance is smaller than 1", {
   rg.imp <- ranger(Species ~ ., data = iris, verbose = FALSE, write.forest = TRUE,
-                    importance = "permutation", scale.permutation.importance = FALSE)
+                   importance = "permutation", scale.permutation.importance = FALSE)
   expect_that(rg.imp$variable.importance[1], is_less_than(1))
 })
 
 test_that("scaled importance is larger than 1", {
   rg.imp <- ranger(Species ~ ., data = iris, verbose = FALSE, write.forest = TRUE,
-                    importance = "permutation", scale.permutation.importance = TRUE)
+                   importance = "permutation", scale.permutation.importance = TRUE)
   expect_that(rg.imp$variable.importance[1], is_more_than(1))
 })
 
@@ -82,10 +82,10 @@ test_that("probability estimations are a matrix with correct size", {
   train.idx <- sample(nrow(iris), 2/3 * nrow(iris))
   iris.train <- iris[train.idx, ]
   iris.test <- iris[-train.idx, ]
-
+  
   rg.prob <- ranger(Species ~ ., data = iris.train, write.forest = TRUE, probability = TRUE)
   prob <- predict(rg.prob, iris.test)
-
+  
   expect_that(prob$predictions, is_a("matrix"))
   expect_that(nrow(prob$predictions), equals(nrow(iris.test)))
   expect_that(ncol(prob$predictions), equals(length(rg.prob$forest$levels)))
@@ -95,10 +95,10 @@ test_that("probability estimations are between 0 and 1 and sum to 1", {
   train.idx <- sample(nrow(iris), 2/3 * nrow(iris))
   iris.train <- iris[train.idx, ]
   iris.test <- iris[-train.idx, ]
-
+  
   rg.prob <- ranger(Species ~ ., data = iris.train, write.forest = TRUE, probability = TRUE)
   prob <- predict(rg.prob, iris.test)
-
+  
   expect_that(all(prob$predictions > -1e-5 & prob$predictions <= 1 + 1e-5), is_true())
   expect_that(rowSums(prob$predictions), equals(rep(1, nrow(prob$predictions))))
 })
@@ -273,3 +273,303 @@ test_that("confusion matrix rows are the true classes", {
               equals(as.numeric(table(iris$Species))))
 })
 
+test_that("case weights work", {
+  expect_that(ranger(Species ~ ., iris, num.trees = 5, case.weights = rep(1, nrow(iris))), 
+              not(throws_error()))
+  
+  ## Should only predict setosa now
+  weights <- c(rep(1, 50), rep(0, 100))
+  rf <- ranger(Species ~ ., iris, num.trees = 5, case.weights = weights, write.forest = TRUE)
+  pred <- predict(rf, iris)$predictions
+  expect_that(all(pred == "setosa"), is_true())
+})
+
+test_that("predict.all for classification returns numeric matrix of size trees x n", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, write.forest = TRUE)
+  pred <- predict(rf, iris, predict.all = TRUE)
+  expect_that(pred$predictions, is_a("matrix"))
+  expect_that(dim(pred$predictions), 
+              equals(c(nrow(iris), rf$num.trees)))
+})
+
+test_that("predict.all for regression returns numeric matrix of size n x trees", {
+  rf <- ranger(Petal.Width ~ ., iris, num.trees = 5, write.forest = TRUE)
+  pred <- predict(rf, iris, predict.all = TRUE)
+  expect_that(pred$predictions, is_a("matrix"))
+  expect_that(dim(pred$predictions), 
+              equals(c(nrow(iris), rf$num.trees)))
+})
+
+test_that("Majority vote of predict.all for classification is equal to forest prediction", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, write.forest = TRUE)
+  pred_forest <- predict(rf, iris, predict.all = FALSE)
+  pred_trees <- predict(rf, iris, predict.all = TRUE)
+  
+  ## Majority vote
+  pred_num <- apply(pred_trees$predictions, 1, function(x) {
+    which(tabulate(x) == max(tabulate(x)))
+  })
+  pred <- factor(pred_num, levels = 1:length(rf$forest$levels),
+                 labels = rf$forest$levels)
+  
+  expect_that(pred, equals(pred_forest$predictions))
+})
+
+test_that("Mean of predict.all for regression is equal to forest prediction", {
+  rf <- ranger(Petal.Width ~ ., iris, num.trees = 5, write.forest = TRUE)
+  pred_forest <- predict(rf, iris, predict.all = FALSE)
+  pred_trees <- predict(rf, iris, predict.all = TRUE)
+  expect_that(rowMeans(pred_trees$predictions), equals(pred_forest$predictions))
+})
+
+test_that("split select weights work", {
+  expect_that(ranger(Species ~ ., iris, num.trees = 5, split.select.weights = c(0.1, 0.2, 0.3, 0.4)), 
+              not(throws_error()))
+  expect_that(ranger(Species ~ ., iris, num.trees = 5, split.select.weights = c(0.1, 0.2, 0.3)), 
+              throws_error())
+})
+
+test_that("Tree-wise split select weights work", {
+  num.trees <- 5
+  weights <- replicate(num.trees, runif(ncol(iris)-1), simplify = FALSE)
+  expect_that(ranger(Species ~ ., iris, num.trees = num.trees, split.select.weights = weights), 
+              not(throws_error()))
+  
+  weights <- replicate(num.trees+1, runif(ncol(iris)-1), simplify = FALSE)
+  expect_that(ranger(Species ~ ., iris, num.trees = num.trees, split.select.weights = weights), 
+              throws_error())
+})
+
+test_that("Inbag count matrix if of right size, with replacement", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, keep.inbag = TRUE)
+  expect_that(dim(data.frame(rf$inbag.counts)), 
+              equals(c(nrow(iris), rf$num.trees)))
+})
+
+test_that("Inbag count matrix if of right size, without replacement", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, replace = FALSE, keep.inbag = TRUE)
+  expect_that(dim(data.frame(rf$inbag.counts)), 
+              equals(c(nrow(iris), rf$num.trees)))
+})
+
+test_that("Inbag count matrix if of right size, with replacement, weighted", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, case.weights = runif(nrow(iris)), keep.inbag = TRUE)
+  expect_that(dim(data.frame(rf$inbag.counts)), 
+              equals(c(nrow(iris), rf$num.trees)))
+})
+
+test_that("Inbag count matrix if of right size, without replacement, weighted", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, replace = FALSE, case.weights = runif(nrow(iris)), keep.inbag = TRUE)
+  expect_that(dim(data.frame(rf$inbag.counts)), 
+              equals(c(nrow(iris), rf$num.trees)))
+})
+
+test_that("Error if sample fraction is 0 or >1", {
+  expect_that(ranger(Species ~ ., iris, num.trees = 5, sample.fraction = 0), 
+              throws_error())
+  expect_that(ranger(Species ~ ., iris, num.trees = 5, sample.fraction = 1.1), 
+              throws_error())
+})
+
+test_that("Number of samples is right sample fraction, replace=FALSE, default", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, keep.inbag = TRUE, replace = FALSE)
+  num.inbag <- sapply(rf$inbag.counts, function(x) {
+    sum(x > 0)
+  })
+  sample.fraction <- mean(num.inbag/nrow(iris))
+  
+  expect_that(sample.fraction, is_more_than(0.6))
+  expect_that(sample.fraction, is_less_than(0.7))
+})
+
+test_that("Number of samples is right sample fraction, replace=FALSE, 0.3", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, keep.inbag = TRUE, replace = FALSE, sample.fraction = 0.3)
+  num.inbag <- sapply(rf$inbag.counts, function(x) {
+    sum(x > 0)
+  })
+  sample.fraction <- mean(num.inbag/nrow(iris))
+  
+  expect_that(sample.fraction, is_more_than(0.25))
+  expect_that(sample.fraction, is_less_than(0.35))
+})
+
+test_that("Number of samples is right sample fraction, replace=TRUE, default", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, keep.inbag = TRUE, replace = TRUE)
+  num.inbag <- sapply(rf$inbag.counts, function(x) {
+    sum(x > 0)
+  })
+  
+  sample.fraction <- mean(num.inbag/nrow(iris))
+  expected.sample.fraction <- 1-exp(-1)
+  
+  expect_that(sample.fraction, is_more_than(expected.sample.fraction-0.05))
+  expect_that(sample.fraction, is_less_than(expected.sample.fraction+0.05))
+})
+
+test_that("Number of samples is right sample fraction, replace=TRUE, 0.5", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, keep.inbag = TRUE, replace = TRUE, sample.fraction = 0.5)
+  num.inbag <- sapply(rf$inbag.counts, function(x) {
+    sum(x > 0)
+  })
+  
+  sample.fraction <- mean(num.inbag/nrow(iris))
+  expected.sample.fraction <- 1-exp(-0.5)
+  
+  expect_that(sample.fraction, is_more_than(expected.sample.fraction-0.05))
+  expect_that(sample.fraction, is_less_than(expected.sample.fraction+0.05))
+})
+
+test_that("Number of samples is right sample fraction, replace=FALSE, 0.3, weighted", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, keep.inbag = TRUE, replace = FALSE, sample.fraction = 0.3, case.weights = runif(nrow(iris)))
+  num.inbag <- sapply(rf$inbag.counts, function(x) {
+    sum(x > 0)
+  })
+  sample.fraction <- mean(num.inbag/nrow(iris))
+  
+  expect_that(sample.fraction, is_more_than(0.25))
+  expect_that(sample.fraction, is_less_than(0.35))
+})
+
+test_that("Number of samples is right sample fraction, replace=TRUE, 0.5, weighted", {
+  rf <- ranger(Species ~ ., iris, num.trees = 5, keep.inbag = TRUE, replace = TRUE, sample.fraction = 0.5, case.weights = runif(nrow(iris)))
+  num.inbag <- sapply(rf$inbag.counts, function(x) {
+    sum(x > 0)
+  })
+  
+  sample.fraction <- mean(num.inbag/nrow(iris))
+  expected.sample.fraction <- 1-exp(-0.5)
+  
+  expect_that(sample.fraction, is_more_than(expected.sample.fraction-0.05))
+  expect_that(sample.fraction, is_less_than(expected.sample.fraction+0.05))
+})
+
+test_that("Alternative interface classification prediction works if only independent variable given, one independent variable", {
+  n <- 50
+  
+  dt <- data.frame(x = runif(n), y = factor(rbinom(n, 1, 0.5)))
+  rf <- ranger(dependent.variable.name = "y", data = dt, num.trees = 5, write.forest = TRUE)
+  expect_that(predict(rf, dt), 
+              not(throws_error()))
+  expect_that(predict(rf, dt[, 1, drop = FALSE]), 
+              not(throws_error()))
+  
+  dt2 <- data.frame(y = factor(rbinom(n, 1, 0.5)), x = runif(n))
+  rf <- ranger(dependent.variable.name = "y", data = dt2, num.trees = 5, write.forest = TRUE)
+  expect_that(predict(rf, dt2), 
+              not(throws_error()))
+  expect_that(predict(rf, dt2[, 2, drop = FALSE]), 
+              not(throws_error()))
+})
+
+test_that("Alternative interface classification prediction works if only independent variable given, two independent variables", {
+  n <- 50
+  
+  dt <- data.frame(x1 = runif(n), x2 = runif(n), y = factor(rbinom(n, 1, 0.5)))
+  rf <- ranger(dependent.variable.name = "y", data = dt, num.trees = 5, write.forest = TRUE)
+  expect_that(predict(rf, dt), 
+              not(throws_error()))
+  expect_that(predict(rf, dt[, 1:2]), 
+              not(throws_error()))
+  
+  dt2 <- data.frame(y = factor(rbinom(n, 1, 0.5)), x1 = runif(n), x2 = runif(n))
+  rf <- ranger(dependent.variable.name = "y", data = dt2, num.trees = 5, write.forest = TRUE)
+  expect_that(predict(rf, dt2), 
+              not(throws_error()))
+  expect_that(predict(rf, dt2[, 2:3]), 
+              not(throws_error()))
+})
+
+test_that("Alternative interface regression prediction works if only independent variable given, one independent variable", {
+  n <- 50
+  
+  dt <- data.frame(x = runif(n), y = rbinom(n, 1, 0.5))
+  rf <- ranger(dependent.variable.name = "y", data = dt, num.trees = 5, write.forest = TRUE)
+  expect_that(predict(rf, dt), 
+              not(throws_error()))
+  expect_that(predict(rf, dt[, 1, drop = FALSE]), 
+              not(throws_error()))
+  
+  dt2 <- data.frame(y = rbinom(n, 1, 0.5), x = runif(n))
+  rf <- ranger(dependent.variable.name = "y", data = dt2, num.trees = 5, write.forest = TRUE)
+  expect_that(predict(rf, dt2), 
+              not(throws_error()))
+  expect_that(predict(rf, dt2[, 2, drop = FALSE]), 
+              not(throws_error()))
+})
+
+test_that("Alternative interface regression prediction works if only independent variable given, two independent variables", {
+  n <- 50
+  
+  dt <- data.frame(x1 = runif(n), x2 = runif(n), y = rbinom(n, 1, 0.5))
+  rf <- ranger(dependent.variable.name = "y", data = dt, num.trees = 5, write.forest = TRUE)
+  expect_that(predict(rf, dt), 
+              not(throws_error()))
+  expect_that(predict(rf, dt[, 1:2]), 
+              not(throws_error()))
+  
+  dt2 <- data.frame(y = rbinom(n, 1, 0.5), x1 = runif(n), x2 = runif(n))
+  rf <- ranger(dependent.variable.name = "y", data = dt2, num.trees = 5, write.forest = TRUE)
+  expect_that(predict(rf, dt2), 
+              not(throws_error()))
+  expect_that(predict(rf, dt2[, 2:3]), 
+              not(throws_error()))
+})
+
+test_that("Alternative interface regression prediction: Results not all the same", {
+  n <- 50
+  
+  dt <- data.frame(x = runif(n), y = rbinom(n, 1, 0.5))
+  rf <- ranger(dependent.variable.name = "y", data = dt, num.trees = 5, write.forest = TRUE)
+  expect_that(diff(range(predict(rf, dt)$predictions)), is_more_than(0))
+  expect_that(diff(range(predict(rf, dt[, 1, drop = FALSE])$predictions)), is_more_than(0))
+  
+  dt2 <- data.frame(y = rbinom(n, 1, 0.5), x = runif(n))
+  rf <- ranger(dependent.variable.name = "y", data = dt2, num.trees = 5, write.forest = TRUE)
+  expect_that(diff(range(predict(rf, dt2)$predictions)), is_more_than(0))
+  expect_that(diff(range(predict(rf, dt2[, 2, drop = FALSE])$predictions)), is_more_than(0))
+})
+
+test_that("No error if survival tree without OOB observations", {
+  dat <- data.frame(time = c(1,2), status = c(0,1), x = c(1,2))
+  expect_that(ranger(Surv(time, status) ~ ., dat, num.trees = 1, num.threads = 1), 
+              not(throws_error()))
+})
+
+test_that("as.factor() in formula works", {
+  n <- 20
+  dt <- data.frame(x = runif(n), y = rbinom(n, 1, 0.5))
+  expect_that(ranger(as.factor(y) ~ ., data = dt, num.trees = 5, write.forest = TRUE), 
+              not(throws_error()))
+})
+
+test_that("If respect.unordered.factors=TRUE, regard characters as unordered", {
+  n <- 20
+  dt <- data.frame(x = sample(c("A", "B", "C", "D"), n, replace = TRUE), 
+                   y = rbinom(n, 1, 0.5), 
+                   stringsAsFactors = FALSE)
+  
+  set.seed(2)
+  rf.char <- ranger(y ~ ., data = dt, num.trees = 5, min.node.size = n/2, respect.unordered.factors = TRUE)
+  
+  dt$x <- factor(dt$x, ordered = FALSE)
+  set.seed(2)
+  rf.fac <- ranger(y ~ ., data = dt, num.trees = 5, min.node.size = n/2, respect.unordered.factors = TRUE)
+  
+  expect_that(rf.char$prediction.error, equals(rf.fac$prediction.error))
+})
+
+test_that("If respect.unordered.factors=FALSE, regard characters as ordered", {
+  n <- 20
+  dt <- data.frame(x = sample(c("A", "B", "C", "D"), n, replace = TRUE), 
+                   y = rbinom(n, 1, 0.5), 
+                   stringsAsFactors = FALSE)
+  
+  set.seed(2)
+  rf.char <- ranger(y ~ ., data = dt, num.trees = 5, min.node.size = n/2, respect.unordered.factors = FALSE)
+  
+  dt$x <- factor(dt$x, ordered = FALSE)
+  set.seed(2)
+  rf.fac <- ranger(y ~ ., data = dt, num.trees = 5, min.node.size = n/2, respect.unordered.factors = FALSE)
+  
+  expect_that(rf.char$prediction.error, equals(rf.fac$prediction.error))
+})

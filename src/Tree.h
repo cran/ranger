@@ -50,7 +50,8 @@ public:
       std::vector<size_t>* deterministic_varIDs, std::vector<size_t>* split_select_varIDs,
       std::vector<double>* split_select_weights, ImportanceMode importance_mode, uint min_node_size,
       std::vector<size_t>* no_split_variables, bool sample_with_replacement, std::vector<bool>* is_unordered,
-      bool memory_saving_splitting, SplitRule splitrule);
+      bool memory_saving_splitting, SplitRule splitrule, std::vector<double>* case_weights, bool keep_inbag,
+      double sample_fraction);
   virtual void initInternal() = 0;
 
   void grow(std::vector<double>* variable_importance);
@@ -79,6 +80,10 @@ public:
     return num_samples_oob;
   }
 
+  const std::vector<size_t>& getInbagCounts() const {
+    return inbag_counts;
+  }
+
 protected:
   void createPossibleSplitVarSubset(std::vector<size_t>& result);
 
@@ -95,6 +100,9 @@ protected:
 
   void bootstrap();
   void bootstrapWithoutReplacement();
+
+  void bootstrapWeighted();
+  void bootstrapWithoutReplacementWeighted();
 
   virtual void cleanUpInternal() = 0;
 
@@ -122,6 +130,9 @@ protected:
   std::vector<size_t>* split_select_varIDs;
   std::vector<double>* split_select_weights;
 
+  // Bootstrap weights
+  std::vector<double>* case_weights;
+
   // Splitting variable for each node
   std::vector<size_t> split_varIDs;
 
@@ -129,7 +140,7 @@ protected:
   // For terminal nodes the prediction value is saved here
   std::vector<double> split_values;
 
-  // For each node a vector with child node IDs, for binary trees second dim = 2
+  // Vector of left and right child node IDs, 0 for no child
   std::vector<std::vector<size_t>> child_nodeIDs;
 
   // For each node a vector with IDs of samples in node
@@ -137,6 +148,10 @@ protected:
 
   // IDs of OOB individuals, sorted
   std::vector<size_t> oob_sampleIDs;
+
+  // Inbag counts
+  bool keep_inbag;
+  std::vector<size_t> inbag_counts;
 
   // Random number generator
   std::mt19937_64 random_number_generator;
@@ -153,6 +168,8 @@ protected:
   std::vector<size_t> prediction_terminal_nodeIDs;
 
   bool sample_with_replacement;
+  double sample_fraction;
+
   bool memory_saving_splitting;
   SplitRule splitrule;
 

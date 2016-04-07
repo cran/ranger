@@ -1,3 +1,15 @@
+##### Version 0.4.0
+* Reduce memory usage of savest forest objects (changed child.nodeIDs interface)
+* Add keep.inbag option to track in-bag counts
+* Add option sample.fraction for fraction of sampled observations
+* Add tree-wise split.select.weights
+* Add predict.all option in predict() to get individual predictions for each tree for classification and regression
+* Add case-specific random forests
+* Add case weights (weighted bootstrapping or subsampling)
+* Remove tuning functions, please use mlr or caret
+* Catch error of outdated gcc not supporting C++11 completely
+* Bug fixes
+
 ##### Version 0.3.0
 * Allow the user to interrupt computation from R
 * Transpose classification.table and rename to confusion.matrix
