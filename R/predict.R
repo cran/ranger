@@ -85,59 +85,73 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
     stop("Error: Invalid forest object.")
   }
   
-  ## If alternative interface used, don't subset data
+  ## Create final data
   if (forest$treetype == "Survival") {
     if (forest$dependent.varID > 0 & forest$status.varID > 1) {
-      if (!is.matrix(data)) {
-        ## Recode characters
-        char.columns <- sapply(data, is.character)
-        data[char.columns] <- lapply(data[char.columns], factor)
-      }
-      data.final <- data.matrix(data)
+      ## If alternative interface used, don't subset data
+      data.used <- data
     } else {
+      ## If formula interface used, subset data
       data.selected <- subset(data, select = forest$independent.variable.names)
-      if (!is.matrix(data.selected)) {
-        ## Recode characters
-        char.columns <- sapply(data.selected, is.character)
-        data.selected[char.columns] <- lapply(data.selected[char.columns], factor)
-      }
-      data.final <- data.matrix(cbind(0, 0, data.selected))
+      
+      ## Arange data as in original data
+      data.used <- cbind(0, 0, data.selected)
       variable.names <- c("time", "status", forest$independent.variable.names)
     }
+      
+  ## Index of no-recode variables
+  idx.norecode <- c(-(forest$dependent.varID+1), -(forest$status.varID+1))
+
   } else {
+    ## No survival
     if (ncol(data) == length(forest$independent.variable.names)+1 & forest$dependent.varID > 0) {
-      if (!is.matrix(data)) {
-        ## Recode characters
-        char.columns <- sapply(data, is.character)
-        data[char.columns] <- lapply(data[char.columns], factor)
-      }
-      data.final <- data.matrix(data)
+      ## If alternative interface used, don't subset data
+      data.used <- data
     } else {
+      ## If formula interface used, subset data
       data.selected <- subset(data, select = forest$independent.variable.names)
-      if (!is.matrix(data.selected)) {
-        ## Recode characters
-        char.columns <- sapply(data.selected, is.character)
-        data.selected[char.columns] <- lapply(data.selected[char.columns], factor)
-      }
+      
       ## Arange data as in original data
       if (forest$dependent.varID == 0) {
-        data.final <- data.matrix(cbind(0, data.selected))
+        data.used <- cbind(0, data.selected)
         variable.names <- c("dependent", forest$independent.variable.names)
       } else if (forest$dependent.varID >= ncol(data)) {
-        data.final <- data.matrix(cbind(data.selected, 0))
+        data.used <- cbind(data.selected, 0)
         variable.names <- c(forest$independent.variable.names, "dependent")
       } else {
-        data.final <- data.matrix(cbind(data.selected[, 1:forest$dependent.varID], 
-                                        0, 
-                                        data.selected[, (forest$dependent.varID+2):ncol(data.selected)]))
+        data.used <- cbind(data.selected[, 1:forest$dependent.varID], 
+                           0, 
+                           data.selected[, (forest$dependent.varID+2):ncol(data.selected)])
         variable.names <- c(forest$independent.variable.names[1:forest$dependent.varID], 
                             "dependent", 
                             forest$independent.variable.names[(forest$dependent.varID+1):length(forest$independent.variable.names)])
       }
     }
+    
+    ## Index of no-recode variables
+    idx.norecode <- -(forest$dependent.varID+1)
+  }
+  
+  ## Recode characters
+  if (!is.matrix(data.used)) {
+    char.columns <- sapply(data.used, is.character)
+    data.used[char.columns] <- lapply(data.used[char.columns], factor)
   }
 
+  ## Recode factors if forest grown 'order' mode
+  if (!is.null(forest$covariate.levels) && !all(sapply(forest$covariate.levels, is.null))) {
+    data.used[, idx.norecode] <- mapply(function(x, y) {
+      if(is.null(y)) {
+        x
+      } else {
+        factor(x, levels = y)
+      }
+    }, data.used[, idx.norecode], forest$covariate.levels, SIMPLIFY = FALSE)
+  }
   
+  ## Convert to data matrix
+  data.final <- data.matrix(data.used)
+
   ## If gwa mode, add snp variable names
   if (gwa.mode) {
     variable.names <- c(variable.names, snp.names)
@@ -194,10 +208,13 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   use.unordered.factor.variables <- FALSE
   save.memory <- FALSE
   splitrule <- 1
+  alpha <- 0
+  minprop <- 0
   case.weights <- c(0, 0)
   use.case.weights <- FALSE
   keep.inbag <- FALSE
   sample.fraction <- 1
+  holdout <- FALSE
   
   ## Call Ranger
   result <- rangerCpp(treetype, dependent.variable.name, data.final, variable.names, mtry,
@@ -206,7 +223,8 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
                       always.split.variables, use.always.split.variables,
                       status.variable.name, prediction.mode, forest, sparse.data, replace, probability,
                       unordered.factor.variables, use.unordered.factor.variables, save.memory, splitrule, 
-                      case.weights, use.case.weights, predict.all, keep.inbag, sample.fraction)
+                      case.weights, use.case.weights, predict.all, keep.inbag, sample.fraction, 
+                      alpha, minprop, holdout)
 
   if (length(result) == 0) {
     stop("User interrupt or internal error.")

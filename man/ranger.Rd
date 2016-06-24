@@ -7,10 +7,11 @@
 ranger(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   importance = "none", write.forest = FALSE, probability = FALSE,
   min.node.size = NULL, replace = TRUE, sample.fraction = ifelse(replace,
-  1, 0.632), splitrule = NULL, case.weights = NULL,
-  split.select.weights = NULL, always.split.variables = NULL,
-  respect.unordered.factors = FALSE, scale.permutation.importance = FALSE,
-  keep.inbag = FALSE, num.threads = NULL, save.memory = FALSE,
+  1, 0.632), case.weights = NULL, splitrule = NULL, alpha = 0.5,
+  minprop = 0.1, split.select.weights = NULL,
+  always.split.variables = NULL, respect.unordered.factors = "ignore",
+  scale.permutation.importance = FALSE, keep.inbag = FALSE,
+  holdout = FALSE, num.threads = NULL, save.memory = FALSE,
   verbose = TRUE, seed = NULL, dependent.variable.name = NULL,
   status.variable.name = NULL, classification = NULL)
 }
@@ -35,19 +36,25 @@ ranger(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
 
 \item{sample.fraction}{Fraction of observations to sample. Default is 1 for sampling with replacement and 0.632 for sampling without replacement.}
 
-\item{splitrule}{Splitting rule, survival only. The splitting rule can be chosen of "logrank" and "C" with default "logrank".}
-
 \item{case.weights}{Weights for sampling of training observations. Observations with larger weights will be selected with higher probability in the bootstrap (or subsampled) samples for the trees.}
+
+\item{splitrule}{Splitting rule, regressiond and survival only. For regression one of "variance" or "maxstat" with default "variance". For survival "logrank", "C" or "maxstat" with default "logrank".}
+
+\item{alpha}{For "maxstat" splitrule: Significance threshold to allow splitting.}
+
+\item{minprop}{For "maxstat" splitrule: Lower quantile of covariate distribtuion to be considered for splitting.}
 
 \item{split.select.weights}{Numeric vector with weights between 0 and 1, representing the probability to select variables for splitting. Alternatively, a list of size num.trees, containing split select weight vectors for each tree can be used.}
 
 \item{always.split.variables}{Character vector with variable names to be always tried for splitting.}
 
-\item{respect.unordered.factors}{Regard unordered factor covariates as unordered categorical variables. If \code{FALSE}, all factors are regarded ordered.}
+\item{respect.unordered.factors}{Handling of unordered factor covariates. One of 'ignore', 'order' and 'partition' with default 'ignore'. Alternatively TRUE (='order') or FALSE (='ignore') can be used. See below for details.}
 
 \item{scale.permutation.importance}{Scale permutation importance by standard error as in (Breiman 2001). Only applicable if permutation variable importance mode selected.}
 
 \item{keep.inbag}{Save how often observations are in-bag in each tree.}
+
+\item{holdout}{Hold-out mode. Hold-out all samples with case weight 0 and use these for variable importance and prediction error.}
 
 \item{num.threads}{Number of threads. Default is number of CPUs available.}
 
@@ -94,12 +101,14 @@ Classification and regression forests are implemented as in the original Random 
 \details{
 The tree type is determined by the type of the dependent variable.
 For factors classification trees are grown, for numeric values regression trees and for survival objects survival trees.
-The Gini index is used as splitting rule for classification, the estimated response variances for regression and the log-rank test for survival.
-For Survival the log-rank test or an AUC-based splitting rule are available.
+The Gini index is used as splitting rule for classification.
+For regression, the estimated response variances or maximally selected rank statistics (Wright et al. 2016) can be used.
+For Survival the log-rank test, a C-index based splitting rule (Schmid et al. 2015) and maximally selected rank statistics (Wright et al. 2016) are available.
 
 With the \code{probability} option and factor dependent variable a probability forest is grown.
-Here, the estimated response variances are used for splitting, as in regression forests.
+Here, the node impurity is used for splitting, as in classification forests.
 Predictions are class probabilities for each sample.
+In contrast to other implementations, each tree returns a probability estimate and these estimates are averaged for the forest probability estimate.
 For details see Malley et al. (2012).
 
 Note that for classification and regression nodes with size smaller than min.node.size can occur, like in original Random Forest.
@@ -108,6 +117,13 @@ Variables selected with \code{always.split.variables} are tried additionaly to t
 In \code{split.select.weights} variables weighted with 0 are never selected and variables with 1 are always selected. 
 Weights do not need to sum up to 1, they will be normalized later. 
 The usage of \code{split.select.weights} can increase the computation times for large forests.
+
+Unordered factor covariates can be handled in 3 different ways by using \code{respect.unordered.factors}: 
+For 'ignore' all factors are regarded ordered, for 'partition' all possible 2-partitions are considered for splitting. 
+For 'order' and 2-class classification the factor levels are ordered by their proportion falling in the second class, for regression by their mean response, as described in Hastie et al. (2009), chapter 9.2.4.
+For multiclass classification and survival outcomes, 'order' is experimental and should be used with care.
+The use of 'order' is recommended for 2-class classification and regression, as it computationally fast and can handle an unlimited number of factor levels. 
+Note that the factors are only reordered once and not again in each split.
 
 For a large number of variables and data frame as input data the formula interface can be slow or impossible to use.
 Alternatively dependent.variable.name (and status.variable.name for survival) can be used.
@@ -119,11 +135,12 @@ All SNPs in the \code{GenABEL} object will be used for splitting.
 To use only the SNPs without sex or other covariates from the phenotype file, use \code{0} on the right hand side of the formula. 
 Note that missing values are treated as an extra category while splitting.
 
-See \url{https://github.com/mnwright/ranger} for the development version.
+See \url{https://github.com/imbs-hl/ranger} for the development version.
 
-Notes:
+To use multithreading on Microsoft Windows platforms, there are currently two options:
 \itemize{
- \item Multithreading is currently not supported for Microsoft Windows platforms.
+ \item Use R-devel with the new toolchain
+ \item Install a binary version of ranger, download: \url{https://github.com/imbs-hl/ranger/releases}
 }
 }
 \examples{
@@ -167,11 +184,16 @@ ranger(trait ~ ., data = dat.gwaa)
 Marvin N. Wright
 }
 \references{
-Wright, M. N. & Ziegler, A. (2016). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. Journal of Statistical Software, in press. \url{http://arxiv.org/abs/1508.04409}.
+\itemize{
+  \item Wright, M. N. & Ziegler, A. (2016). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. Journal of Statistical Software, in press. \url{http://arxiv.org/abs/1508.04409}.
+  \item Schmid, M., Wright, M. N. & Ziegler, A. (2015). On the Use of Harrell's C for Node Splitting in Random Survival Forests. Technical Report. \url{http://arxiv.org/abs/1507.03092}. 
+  \item Wright, M. N., Dankowski, T. & Ziegler, A. (2016). Random forests for survival analysis using maximally selected rank statistics. Technical Report. \url{http://arxiv.org/abs/1605.03391}.
 
-  Breiman, L. (2001). Random forests. Mach Learn, 45(1), 5-32. \cr
-  Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat, 841-860. \cr
-  Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med, 51(1), 74.
+  \item Breiman, L. (2001). Random forests. Mach Learn, 45(1), 5-32. 
+  \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat, 841-860. 
+  \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med, 51(1), 74.
+  \item Hastie, T., Tibshirani, R., Friedman, J. (2009). The Elements of Statistical Learning. Springer, New York. 2nd edition.
+  }
 }
 \seealso{
 \code{\link{predict.ranger}}
