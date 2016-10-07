@@ -10,9 +10,9 @@ if (!requireNamespace("GenABEL", quietly = TRUE)) {
   rg.gwaa <- ranger(CHD ~ ., data = dat.gwaa, verbose = FALSE, write.forest = TRUE)
 }
 
-test_that("classification gwaa rf is of class ranger with 14 elements", {
+test_that("classification gwaa rf is of class ranger with 13 elements", {
   expect_is(rg.gwaa, "ranger")
-  expect_equal(length(rg.gwaa), 14)
+  expect_equal(length(rg.gwaa), 13)
 })
 
 test_that("Matrix interface works for Probability estimation", {
@@ -76,5 +76,34 @@ test_that("holdout mode: no OOB prediction if no 0 weights", {
 
 test_that("Probability estimation works for empty classes", {
   expect_silent(rf <- ranger(Species ~., iris[1:100,],  num.trees = 5, probability = TRUE))
+})
+
+test_that("OOB error is correct for 1 tree, classification", {
+  n <- 50
+  dat <- data.frame(y = factor(rbinom(n, 1, .5)), x = rnorm(n))
+  rf <- ranger(y ~ ., dat, num.trees = 1)
+  expect_equal(rf$prediction.error, mean(rf$predictions != dat$y, na.rm = TRUE))
+})
+
+test_that("OOB error is correct for 1 tree, probability prediction", {
+  n <- 50
+  dat <- data.frame(y = factor(rbinom(n, 1, .5)), x = rnorm(n))
+  rf <- ranger(y ~ ., dat, num.trees = 1, probability = TRUE)
+  prob <- c(rf$predictions[dat$y == "0", 1], rf$predictions[dat$y == "1", 2])
+  expect_equal(rf$prediction.error, mean((1 - prob)^2, na.rm = TRUE))
+})
+
+test_that("OOB error is correct for 1 tree, regression", {
+  n <- 50
+  dat <- data.frame(y = rbinom(n, 1, .5), x = rnorm(n))
+  rf <- ranger(y ~ ., dat, num.trees = 1)
+  expect_equal(rf$prediction.error, mean((dat$y - rf$predictions)^2, na.rm = TRUE))
+})
+
+test_that("Missing value columns detected in training", {
+  dat <- iris
+  dat[4, 5] <- NA
+  dat[25, 1] <- NA
+  expect_error(ranger(Species ~ ., dat, num.trees = 5), "Missing data in columns: Sepal.Length, Species")
 })
 

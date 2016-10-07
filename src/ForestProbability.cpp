@@ -106,8 +106,14 @@ void ForestProbability::predictInternal() {
   // First dim samples, second dim classes
   size_t num_prediction_samples = data->getNumRows();
   predictions.resize(num_prediction_samples);
-  for (size_t i = 0; i < num_prediction_samples; ++i) {
-    predictions[i].resize(class_values.size(), 0);
+  if (prediction_type == TERMINALNODES) {
+    for (size_t i = 0; i < num_prediction_samples; ++i) {
+      predictions[i].resize(num_trees, 0);
+    }
+  } else {
+    for (size_t i = 0; i < num_prediction_samples; ++i) {
+      predictions[i].resize(class_values.size(), 0);
+    }
   }
 
   // For all samples average proportions of trees
@@ -115,11 +121,17 @@ void ForestProbability::predictInternal() {
 
     // For each sample compute proportions in each tree and average over trees
     for (size_t tree_idx = 0; tree_idx < num_trees; ++tree_idx) {
-      std::vector<double> counts = ((TreeProbability*) trees[tree_idx])->getPrediction(sample_idx);
+      if (prediction_type == TERMINALNODES) {
+        predictions[sample_idx][tree_idx] = ((TreeProbability*) trees[tree_idx])->getPredictionTerminalNodeID(
+            sample_idx);
+      } else {
+        std::vector<double> counts = ((TreeProbability*) trees[tree_idx])->getPrediction(sample_idx);
 
-      for (size_t class_idx = 0; class_idx < counts.size(); ++class_idx) {
-        predictions[sample_idx][class_idx] += counts[class_idx] / num_trees;
+        for (size_t class_idx = 0; class_idx < counts.size(); ++class_idx) {
+          predictions[sample_idx][class_idx] += counts[class_idx] / num_trees;
+        }
       }
+
     }
   }
 
@@ -148,18 +160,24 @@ void ForestProbability::computePredictionErrorInternal() {
   }
 
   // MSE with predicted probability and true data
+  size_t num_predictions = 0;
   for (size_t i = 0; i < predictions.size(); ++i) {
     if (samples_oob_count[i] > 0) {
+      ++num_predictions;
       for (size_t j = 0; j < predictions[i].size(); ++j) {
         predictions[i][j] /= (double) samples_oob_count[i];
       }
       size_t real_classID = response_classIDs[i];
       double predicted_value = predictions[i][real_classID];
       overall_prediction_error += (1 - predicted_value) * (1 - predicted_value);
+    } else {
+      for (size_t j = 0; j < predictions[i].size(); ++j) {
+        predictions[i][j] = NAN;
+      }
     }
   }
 
-  overall_prediction_error /= (double) predictions.size();
+  overall_prediction_error /= (double) num_predictions;
 }
 
 void ForestProbability::writeOutputInternal() {
@@ -257,9 +275,9 @@ void ForestProbability::loadFromFileInternal(std::ifstream& infile) {
 
     // Convert Terminal node class counts to vector with empty elemtents for non-terminal nodes
     std::vector<std::vector<double>> terminal_class_counts;
-    terminal_class_counts.resize(child_nodeIDs.size(), std::vector<double>());
-    for (size_t i = 0; i < terminal_nodes.size(); ++i) {
-      terminal_class_counts[terminal_nodes[i]] = terminal_class_counts_vector[i];
+    terminal_class_counts.resize(child_nodeIDs[0].size(), std::vector<double>());
+    for (size_t j = 0; j < terminal_nodes.size(); ++j) {
+      terminal_class_counts[terminal_nodes[j]] = terminal_class_counts_vector[j];
     }
 
     // If dependent variable not in test data, change variable IDs accordingly

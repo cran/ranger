@@ -127,13 +127,21 @@ void ForestSurvival::predictInternal() {
 // First dim trees, second dim samples, third dim time
   for (size_t i = 0; i < num_prediction_samples; ++i) {
     std::vector<double> sample_prediction;
-    sample_prediction.reserve(num_timepoints);
-    for (size_t j = 0; j < num_timepoints; ++j) {
-      double sample_time_prediction = 0;
+
+    if (prediction_type == TERMINALNODES) {
+      sample_prediction.reserve(num_trees);
       for (size_t k = 0; k < num_trees; ++k) {
-        sample_time_prediction += ((TreeSurvival*) trees[k])->getPrediction(i)[j];
+        sample_prediction.push_back(((TreeSurvival*) trees[k])->getPredictionTerminalNodeID(i));
       }
-      sample_prediction.push_back(sample_time_prediction / num_trees);
+    } else {
+      sample_prediction.reserve(num_timepoints);
+      for (size_t j = 0; j < num_timepoints; ++j) {
+        double sample_time_prediction = 0;
+        for (size_t k = 0; k < num_trees; ++k) {
+          sample_time_prediction += ((TreeSurvival*) trees[k])->getPrediction(i)[j];
+        }
+        sample_prediction.push_back(sample_time_prediction / num_trees);
+      }
     }
     predictions.push_back(sample_prediction);
   }
@@ -289,12 +297,12 @@ void ForestSurvival::loadFromFileInternal(std::ifstream& infile) {
 
     // Convert chf to vector with empty elements for non-terminal nodes
     std::vector<std::vector<double>> chf;
-    chf.resize(child_nodeIDs.size(), std::vector<double>());
+    chf.resize(child_nodeIDs[0].size(), std::vector<double>());
 //    for (size_t i = 0; i < child_nodeIDs.size(); ++i) {
 //      chf.push_back(std::vector<double>());
 //    }
-    for (size_t i = 0; i < terminal_nodes.size(); ++i) {
-      chf[terminal_nodes[i]] = chf_vector[i];
+    for (size_t j = 0; j < terminal_nodes.size(); ++j) {
+      chf[terminal_nodes[j]] = chf_vector[j];
     }
 
     // If dependent variable not in test data, change variable IDs accordingly

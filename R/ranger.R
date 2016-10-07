@@ -43,11 +43,13 @@
 ##' In contrast to other implementations, each tree returns a probability estimate and these estimates are averaged for the forest probability estimate.
 ##' For details see Malley et al. (2012).
 ##'
-##' Note that for classification and regression nodes with size smaller than min.node.size can occur, like in original Random Forest.
-##' For survival all nodes contain at least min.node.size samples. 
+##' Note that for classification and regression nodes with size smaller than \code{min.node.size} can occur, as in original Random Forests.
+##' For survival all nodes contain at \code{min.node.size} samples. 
 ##' Variables selected with \code{always.split.variables} are tried additionaly to the mtry variables randomly selected.
 ##' In \code{split.select.weights} variables weighted with 0 are never selected and variables with 1 are always selected. 
 ##' Weights do not need to sum up to 1, they will be normalized later. 
+##' The weights are assigned to the variables in the order they appear in the formula or in the data if no formula is used.
+##' Names of the \code{split.select.weights} vector are ignored.
 ##' The usage of \code{split.select.weights} can increase the computation times for large forests.
 ##'
 ##' Unordered factor covariates can be handled in 3 different ways by using \code{respect.unordered.factors}: 
@@ -57,9 +59,9 @@
 ##' The use of 'order' is recommended for 2-class classification and regression, as it computationally fast and can handle an unlimited number of factor levels. 
 ##' Note that the factors are only reordered once and not again in each split. 
 ##'
-##' For a large number of variables and data frame as input data the formula interface can be slow or impossible to use.
-##' Alternatively dependent.variable.name (and status.variable.name for survival) can be used.
-##' Consider setting \code{save.memory = TRUE} if you encounter memory problems for very large datasets. 
+##' For a large number of variables and data frames as input data the formula interface can be slow or impossible to use.
+##' Alternatively \code{dependent.variable.name} (and \code{status.variable.name} for survival) can be used.
+##' Consider setting \code{save.memory = TRUE} if you encounter memory problems for very large datasets, but be aware that this option slows down the tree growing. 
 ##' 
 ##' For GWAS data consider combining \code{ranger} with the \code{GenABEL} package. 
 ##' See the Examples section below for a demonstration using \code{Plink} data.
@@ -69,11 +71,8 @@
 ##' 
 ##' See \url{https://github.com/imbs-hl/ranger} for the development version.
 ##' 
-##' To use multithreading on Microsoft Windows platforms, there are currently two options:
-##' \itemize{
-##'  \item Use R-devel with the new toolchain
-##'  \item Install a binary version of ranger, download: \url{https://github.com/imbs-hl/ranger/releases}
-##' }
+##' With recent R versions, multithreading on Windows platforms should just work. 
+##' If you compile yourself, the new RTools toolchain is required.
 ##' 
 ##' @title Ranger
 ##' @param formula Object of class \code{formula} or \code{character} describing the model to fit.
@@ -81,31 +80,29 @@
 ##' @param num.trees Number of trees.
 ##' @param mtry Number of variables to possibly split at in each node. Default is the (rounded down) square root of the number variables. 
 ##' @param importance Variable importance mode, one of 'none', 'impurity', 'permutation'. The 'impurity' measure is the Gini index for classification and the variance of the responses for regression. For survival, only 'permutation' is available.
-##' @param write.forest Save \code{ranger.forest} object, needed for prediction.
+##' @param write.forest Save \code{ranger.forest} object, required for prediction. Set to \code{FALSE} to reduce memory usage if no prediction intended.
 ##' @param probability Grow a probability forest as in Malley et al. (2012). 
 ##' @param min.node.size Minimal node size. Default 1 for classification, 5 for regression, 3 for survival, and 10 for probability.
 ##' @param replace Sample with replacement. 
 ##' @param sample.fraction Fraction of observations to sample. Default is 1 for sampling with replacement and 0.632 for sampling without replacement. 
 ##' @param case.weights Weights for sampling of training observations. Observations with larger weights will be selected with higher probability in the bootstrap (or subsampled) samples for the trees.
-##' @param splitrule Splitting rule, regressiond and survival only. For regression one of "variance" or "maxstat" with default "variance". For survival "logrank", "C" or "maxstat" with default "logrank". 
+##' @param splitrule Splitting rule, regression and survival only. For regression one of "variance" or "maxstat" with default "variance". For survival "logrank", "C" or "maxstat" with default "logrank". 
 ##' @param alpha For "maxstat" splitrule: Significance threshold to allow splitting.
 ##' @param minprop For "maxstat" splitrule: Lower quantile of covariate distribtuion to be considered for splitting.
 ##' @param split.select.weights Numeric vector with weights between 0 and 1, representing the probability to select variables for splitting. Alternatively, a list of size num.trees, containing split select weight vectors for each tree can be used.  
-##' @param always.split.variables Character vector with variable names to be always tried for splitting.
+##' @param always.split.variables Character vector with variable names to be always selected in addition to the \code{mtry} variables tried for splitting.
 ##' @param respect.unordered.factors Handling of unordered factor covariates. One of 'ignore', 'order' and 'partition' with default 'ignore'. Alternatively TRUE (='order') or FALSE (='ignore') can be used. See below for details. 
 ##' @param scale.permutation.importance Scale permutation importance by standard error as in (Breiman 2001). Only applicable if permutation variable importance mode selected.
 ##' @param keep.inbag Save how often observations are in-bag in each tree. 
 ##' @param holdout Hold-out mode. Hold-out all samples with case weight 0 and use these for variable importance and prediction error.
 ##' @param num.threads Number of threads. Default is number of CPUs available.
-##' @param save.memory Use memory saving (but slower) splitting mode. No effect for GWAS data.
-##' @param verbose Verbose output on or off.
+##' @param save.memory Use memory saving (but slower) splitting mode. No effect for GWAS data. Warning: This option slows down the tree growing, use only if you encounter memory problems.
+##' @param verbose Show computation status and estimated runtime.
 ##' @param seed Random seed. Default is \code{NULL}, which generates the seed from \code{R}. 
 ##' @param dependent.variable.name Name of dependent variable, needed if no formula given. For survival forests this is the time variable.
 ##' @param status.variable.name Name of status variable, only applicable to survival data and needed if no formula given. Use 1 for event and 0 for censoring.
 ##' @param classification Only needed if data is a matrix. Set to \code{TRUE} to grow a classification forest.
 ##' @return Object of class \code{ranger} with elements
-##'   \item{\code{forest}}{Saved forest (If write.forest set to TRUE). Note that the variable IDs in the \code{split.varIDs} object do not necessarily represent the column number in R.}
-##'   \item{\code{predictions}}{Predicted classes/values, based on out of bag samples (classification and regression only).}
 ##'   \item{\code{forest}}{Saved forest (If write.forest set to TRUE). Note that the variable IDs in the \code{split.varIDs} object do not necessarily represent the column number in R.}
 ##'   \item{\code{predictions}}{Predicted classes/values, based on out of bag samples (classification and regression only).}
 ##'   \item{\code{variable.importance}}{Variable importance for each independent variable.}
@@ -164,7 +161,7 @@
 ##' @references
 ##' \itemize{
 ##'   \item Wright, M. N. & Ziegler, A. (2016). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. Journal of Statistical Software, in press. \url{http://arxiv.org/abs/1508.04409}.
-##'   \item Schmid, M., Wright, M. N. & Ziegler, A. (2015). On the Use of Harrell's C for Node Splitting in Random Survival Forests. Technical Report. \url{http://arxiv.org/abs/1507.03092}. 
+##'   \item Schmid, M., Wright, M. N. & Ziegler, A. (2015). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Systems with Applications 63:450-459. \url{http://dx.doi.org/10.1016/j.eswa.2016.07.018}. 
 ##'   \item Wright, M. N., Dankowski, T. & Ziegler, A. (2016). Random forests for survival analysis using maximally selected rank statistics. Technical Report. \url{http://arxiv.org/abs/1605.03391}.
 ##' 
 ##'   \item Breiman, L. (2001). Random forests. Mach Learn, 45(1), 5-32. 
@@ -179,7 +176,7 @@
 ##' @import utils
 ##' @export
 ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
-                   importance = "none", write.forest = FALSE, probability = FALSE,
+                   importance = "none", write.forest = TRUE, probability = FALSE,
                    min.node.size = NULL, replace = TRUE, 
                    sample.fraction = ifelse(replace, 1, 0.632), 
                    case.weights = NULL, 
@@ -206,6 +203,13 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   } else {
     sparse.data <- as.matrix(0)
     gwa.mode <- FALSE
+  }
+  
+  ## Check missing values
+  if (any(is.na(data))) {
+    offending_columns <- colnames(data)[colSums(is.na(data)) > 0]
+    stop("Missing data in columns: ",
+         paste0(offending_columns, collapse = ", "), ".", call. = FALSE)
   }
   
   ## Formula interface. Use whole data frame is no formula provided and depvarname given
@@ -325,7 +329,6 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     data.final <- data.matrix(data.selected)
   }
   variable.names <- colnames(data.final)
-  
   
   ## If gwa mode, add snp variable names
   if (gwa.mode) {
@@ -550,6 +553,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   ## Prediction mode always false. Use predict.ranger() method.
   prediction.mode <- FALSE
   predict.all <- FALSE
+  prediction.type <- 1
   
   ## No loaded forest object
   loaded.forest <- list()
@@ -565,7 +569,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                       status.variable.name, prediction.mode, loaded.forest, sparse.data,
                       replace, probability, unordered.factor.variables, use.unordered.factor.variables, 
                       save.memory, splitrule.num, case.weights, use.case.weights, predict.all, 
-                      keep.inbag, sample.fraction, alpha, minprop, holdout)
+                      keep.inbag, sample.fraction, alpha, minprop, holdout, prediction.type)
   
   if (length(result) == 0) {
     stop("User interrupt or internal error.")
@@ -579,15 +583,19 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   
   ## Set predictions
   if (treetype == 1 & is.factor(response)) {
-    result$predictions <- factor(result$predictions, levels = 1:nlevels(response),
-                                 labels = levels(response))
-    result$confusion.matrix <- table(unlist(data.final[, dependent.variable.name]), result$predictions, dnn = c("true", "predicted"))
+    result$predictions <- integer.to.factor(result$predictions,
+                                            levels(response))
+    true.values <- integer.to.factor(unlist(data.final[, dependent.variable.name]),
+                                     levels(response))
+    result$confusion.matrix <- table(true.values, result$predictions, dnn = c("true", "predicted"))
   } else if (treetype == 5) {
     result$chf <- result$predictions
     result$predictions <- NULL
     result$survival <- exp(-result$chf)
   } else if (treetype == 9 & !is.matrix(data)) {
-    colnames(result$predictions) <- levels(droplevels(response))
+    ## Set colnames and sort by levels
+    colnames(result$predictions) <- unique(response)
+    result$predictions <- result$predictions[, levels(droplevels(response))]
   }
   
   ## Splitrule
@@ -632,3 +640,6 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
 
 
 
+integer.to.factor <- function(x, labels) {
+  factor(x, levels = seq_along(labels), labels = labels)
+}

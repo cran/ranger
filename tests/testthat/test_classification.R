@@ -10,9 +10,9 @@ rg.class <- ranger(Species ~ ., data = iris, verbose = FALSE, write.forest = TRU
 rg.mat   <- ranger(dependent.variable.name = "Species", data = dat, write.forest = TRUE, classification = TRUE)
 
 ## Basic tests (for all random forests equal)
-test_that("classification result is of class ranger with 14 elements", {
+test_that("classification result is of class ranger with 13 elements", {
   expect_is(rg.class, "ranger")
-  expect_equal(length(rg.class), 14)
+  expect_equal(length(rg.class), 13)
 })
 
 test_that("results have 500 trees", {
@@ -54,13 +54,18 @@ test_that("Majority vote of predict.all for classification is equal to forest pr
   rf <- ranger(Species ~ ., iris, num.trees = 5, write.forest = TRUE)
   pred_forest <- predict(rf, iris, predict.all = FALSE)
   pred_trees <- predict(rf, iris, predict.all = TRUE)
-  ## Majority vote
+  ## Majority vote, NA for ties
   pred_num <- apply(pred_trees$predictions, 1, function(x) {
-    which(tabulate(x) == max(tabulate(x)))[1]
+    res <- which(tabulate(x) == max(tabulate(x)))
+    if (length(res) == 1) {
+      res
+    } else {
+      NA
+    }
   })
-  pred <- factor(pred_num, levels = 1:length(rf$forest$levels),
-                 labels = rf$forest$levels)
-  expect_equal(pred, pred_forest$predictions)
+  pred <- integer.to.factor(pred_num, rf$forest$levels)
+  idx <- !is.na(pred)
+  expect_equal(pred[idx], pred_forest$predictions[idx])
 })
 
 test_that("Alternative interface classification prediction works if only independent variable given, one independent variable", {
@@ -100,6 +105,11 @@ test_that("predict works for single observations, classification", {
 test_that("confusion matrix is of right dimension", {
   expect_equal(dim(rg.class$confusion.matrix), 
                rep(nlevels(iris$Species), 2))
+})
+
+test_that("confusion matrix has right dimnames", {
+  expect_equal(dimnames(rg.class$confusion.matrix),
+               list(true = levels(iris$Species), predicted = levels(iris$Species)))
 })
 
 test_that("confusion matrix rows are the true classes", {

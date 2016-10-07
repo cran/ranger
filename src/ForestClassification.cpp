@@ -116,12 +116,17 @@ void ForestClassification::predictInternal() {
   // For all samples get tree predictions
   for (size_t sample_idx = 0; sample_idx < num_prediction_samples; ++sample_idx) {
 
-    if (predict_all) {
+    if (predict_all || prediction_type == TERMINALNODES) {
       // Get all tree predictions
       std::vector<double> sample_predictions;
       sample_predictions.reserve(num_trees);
       for (size_t tree_idx = 0; tree_idx < num_trees; ++tree_idx) {
-        double value = ((TreeClassification*) trees[tree_idx])->getPrediction(sample_idx);
+        double value;
+        if (prediction_type == TERMINALNODES) {
+          value = ((TreeClassification*) trees[tree_idx])->getPredictionTerminalNodeID(sample_idx);
+        } else {
+          value = ((TreeClassification*) trees[tree_idx])->getPrediction(sample_idx);
+        }
         sample_predictions.push_back(value);
       }
       predictions.push_back(sample_predictions);
@@ -173,9 +178,11 @@ void ForestClassification::computePredictionErrorInternal() {
 
   // Compare predictions with true data
   size_t num_missclassifications = 0;
+  size_t num_predictions = 0;
   for (size_t i = 0; i < predictions.size(); ++i) {
     double predicted_value = predictions[i][0];
     if (!std::isnan(predicted_value)) {
+      ++num_predictions;
       double real_value = data->get(i, dependent_varID);
       if (predicted_value != real_value) {
         ++num_missclassifications;
@@ -183,7 +190,7 @@ void ForestClassification::computePredictionErrorInternal() {
       ++classification_table[std::make_pair(real_value, predicted_value)];
     }
   }
-  overall_prediction_error = (double) num_missclassifications / (double) predictions.size();
+  overall_prediction_error = (double) num_missclassifications / (double) num_predictions;
 }
 
 void ForestClassification::writeOutputInternal() {
