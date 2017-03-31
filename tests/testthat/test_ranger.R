@@ -104,6 +104,102 @@ test_that("Missing value columns detected in training", {
   dat <- iris
   dat[4, 5] <- NA
   dat[25, 1] <- NA
-  expect_error(ranger(Species ~ ., dat, num.trees = 5), "Missing data in columns: Sepal.Length, Species")
+  expect_error(ranger(Species ~ ., dat, num.trees = 5), "Missing data in columns: Species, Sepal.Length")
 })
 
+test_that("No error if missing value in irrelevant column, training", {
+  dat <- iris
+  dat[1, "Sepal.Width"] <- NA
+  expect_silent(ranger(Species ~ Sepal.Length, dat, num.trees = 5))
+})
+
+test_that("No error if missing value in irrelevant column, prediction", {
+  rf <- ranger(Species ~ Sepal.Length, iris, num.trees = 5)
+  dat <- iris
+  dat[1, "Sepal.Width"] <- NA
+  expect_silent(predict(rf, dat))
+})
+
+test_that("Split points are at (A+B)/2 for numeric features, regression variance splitting", {
+  dat <- data.frame(y = rbinom(100, 1, .5), x = rbinom(100, 1, .5))
+  rf <- ranger(y ~ x, dat, num.trees = 10)
+  split_points <- mapply(function(varID, value) {
+    value[varID > 0]
+    }, 
+    rf$forest$split.varIDs, 
+    rf$forest$split.values
+  )
+  expect_equal(split_points, rep(0.5, rf$num.trees))
+})
+
+test_that("Split points are at (A+B)/2 for numeric features, regression maxstat splitting", {
+  dat <- data.frame(y = rbinom(100, 1, .5), x = rbinom(100, 1, .5))
+  rf <- ranger(y ~ x, dat, num.trees = 10, splitrule = "maxstat", alpha = 1)
+  split_points <- mapply(function(varID, value) {
+    value[varID > 0]
+    }, 
+    rf$forest$split.varIDs, 
+    rf$forest$split.values
+  )
+  expect_equal(split_points, rep(0.5, rf$num.trees))
+})
+
+test_that("Split points are at (A+B)/2 for numeric features, classification", {
+  dat <- data.frame(y = factor(rbinom(100, 1, .5)), x = rbinom(100, 1, .5))
+  rf <- ranger(y ~ x, dat, num.trees = 10)
+  split_points <- mapply(function(varID, value) {
+    value[varID > 0]
+  }, 
+  rf$forest$split.varIDs, 
+  rf$forest$split.values
+  )
+  expect_equal(split_points, rep(0.5, rf$num.trees))
+})
+
+test_that("Split points are at (A+B)/2 for numeric features, probability", {
+  dat <- data.frame(y = factor(rbinom(100, 1, .5)), x = rbinom(100, 1, .5))
+  rf <- ranger(y ~ x, dat, num.trees = 10, probability = TRUE)
+  split_points <- mapply(function(varID, value) {
+    value[varID > 0]
+  }, 
+  rf$forest$split.varIDs, 
+  rf$forest$split.values
+  )
+  expect_equal(split_points, rep(0.5, rf$num.trees))
+})
+
+test_that("Split points are at (A+B)/2 for numeric features, survival logrank splitting", {
+  dat <- data.frame(time = runif(100, 1, 10), status = rbinom(100, 1, .5), x = rbinom(100, 1, .5))
+  rf <- ranger(Surv(time, status) ~ x, dat, num.trees = 10, splitrule = "logrank")
+  split_points <- mapply(function(varID, value) {
+    value[varID > 0]
+  }, 
+  rf$forest$split.varIDs, 
+  rf$forest$split.values
+  )
+  expect_equal(split_points, rep(0.5, rf$num.trees))
+})
+
+test_that("Split points are at (A+B)/2 for numeric features, survival C-index splitting", {
+  dat <- data.frame(time = runif(100, 1, 10), status = rbinom(100, 1, .5), x = rbinom(100, 1, .5))
+  rf <- ranger(Surv(time, status) ~ x, dat, num.trees = 10, splitrule = "C")
+  split_points <- mapply(function(varID, value) {
+    value[varID > 0]
+  }, 
+  rf$forest$split.varIDs, 
+  rf$forest$split.values
+  )
+  expect_equal(split_points, rep(0.5, rf$num.trees))
+})
+
+test_that("Split points are at (A+B)/2 for numeric features, survival maxstat splitting", {
+  dat <- data.frame(time = runif(100, 1, 10), status = rbinom(100, 1, .5), x = rbinom(100, 1, .5))
+  rf <- ranger(Surv(time, status) ~ x, dat, num.trees = 10, splitrule = "maxstat", alpha = 1)
+  split_points <- mapply(function(varID, value) {
+    value[varID > 0]
+  }, 
+  rf$forest$split.varIDs, 
+  rf$forest$split.values
+  )
+  expect_equal(split_points, rep(0.5, rf$num.trees))
+})

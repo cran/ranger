@@ -7,16 +7,16 @@
 ranger(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   importance = "none", write.forest = TRUE, probability = FALSE,
   min.node.size = NULL, replace = TRUE, sample.fraction = ifelse(replace,
-  1, 0.632), case.weights = NULL, splitrule = NULL, alpha = 0.5,
-  minprop = 0.1, split.select.weights = NULL,
-  always.split.variables = NULL, respect.unordered.factors = "ignore",
+  1, 0.632), case.weights = NULL, splitrule = NULL, num.random.splits = 1,
+  alpha = 0.5, minprop = 0.1, split.select.weights = NULL,
+  always.split.variables = NULL, respect.unordered.factors = NULL,
   scale.permutation.importance = FALSE, keep.inbag = FALSE,
   holdout = FALSE, num.threads = NULL, save.memory = FALSE,
   verbose = TRUE, seed = NULL, dependent.variable.name = NULL,
   status.variable.name = NULL, classification = NULL)
 }
 \arguments{
-\item{formula}{Object of class \code{formula} or \code{character} describing the model to fit.}
+\item{formula}{Object of class \code{formula} or \code{character} describing the model to fit. Interaction terms supported only for numerical variables.}
 
 \item{data}{Training data of class \code{data.frame}, \code{matrix} or \code{gwaa.data} (GenABEL).}
 
@@ -38,7 +38,9 @@ ranger(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
 
 \item{case.weights}{Weights for sampling of training observations. Observations with larger weights will be selected with higher probability in the bootstrap (or subsampled) samples for the trees.}
 
-\item{splitrule}{Splitting rule, regression and survival only. For regression one of "variance" or "maxstat" with default "variance". For survival "logrank", "C" or "maxstat" with default "logrank".}
+\item{splitrule}{Splitting rule. For classification and probability estimation "gini" or "extratrees" with default "gini". For regression "variance", "extratrees" or "maxstat" with default "variance". For survival "logrank", "extratrees", "C" or "maxstat" with default "logrank".}
+
+\item{num.random.splits}{For "extratrees" splitrule.: Number of random splits to consider for each candidate splitting variable.}
 
 \item{alpha}{For "maxstat" splitrule: Significance threshold to allow splitting.}
 
@@ -48,7 +50,7 @@ ranger(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
 
 \item{always.split.variables}{Character vector with variable names to be always selected in addition to the \code{mtry} variables tried for splitting.}
 
-\item{respect.unordered.factors}{Handling of unordered factor covariates. One of 'ignore', 'order' and 'partition' with default 'ignore'. Alternatively TRUE (='order') or FALSE (='ignore') can be used. See below for details.}
+\item{respect.unordered.factors}{Handling of unordered factor covariates. One of 'ignore', 'order' and 'partition'. For the "extratrees" splitrule the default is "partition" for all other splitrules 'ignore'. Alternatively TRUE (='order') or FALSE (='ignore') can be used. See below for details.}
 
 \item{scale.permutation.importance}{Scale permutation importance by standard error as in (Breiman 2001). Only applicable if permutation variable importance mode selected.}
 
@@ -76,7 +78,7 @@ Object of class \code{ranger} with elements
   \item{\code{predictions}}{Predicted classes/values, based on out of bag samples (classification and regression only).}
   \item{\code{variable.importance}}{Variable importance for each independent variable.}
   \item{\code{prediction.error}}{Overall out of bag prediction error. For classification this is the fraction of missclassified samples, for regression the mean squared error and for survival one minus Harrell's c-index.}
-  \item{\code{r.squared}}{R squared. Also called explained variance or coefficient of determination (regression only).}
+  \item{\code{r.squared}}{R squared. Also called explained variance or coefficient of determination (regression only). Computed on out of bag data.}
   \item{\code{confusion.matrix}}{Contingency table for classes and predictions based on out of bag samples (classification only).}
   \item{\code{unique.death.times}}{Unique death times (survival only).}
   \item{\code{chf}}{Estimated cumulative hazard function for each sample (survival only).}
@@ -99,9 +101,10 @@ Classification and regression forests are implemented as in the original Random 
 \details{
 The tree type is determined by the type of the dependent variable.
 For factors classification trees are grown, for numeric values regression trees and for survival objects survival trees.
-The Gini index is used as splitting rule for classification.
+The Gini index is used as default splitting rule for classification.
 For regression, the estimated response variances or maximally selected rank statistics (Wright et al. 2016) can be used.
 For Survival the log-rank test, a C-index based splitting rule (Schmid et al. 2015) and maximally selected rank statistics (Wright et al. 2016) are available.
+For all tree types, forests of extremely randomized trees (Geurts et al. 2006) can be grown.
 
 With the \code{probability} option and factor dependent variable a probability forest is grown.
 Here, the node impurity is used for splitting, as in classification forests.
@@ -182,14 +185,14 @@ Marvin N. Wright
 }
 \references{
 \itemize{
-  \item Wright, M. N. & Ziegler, A. (2016). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. Journal of Statistical Software, in press. \url{http://arxiv.org/abs/1508.04409}.
-  \item Schmid, M., Wright, M. N. & Ziegler, A. (2015). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Systems with Applications 63:450-459. \url{http://dx.doi.org/10.1016/j.eswa.2016.07.018}. 
-  \item Wright, M. N., Dankowski, T. & Ziegler, A. (2016). Random forests for survival analysis using maximally selected rank statistics. Technical Report. \url{http://arxiv.org/abs/1605.03391}.
-
-  \item Breiman, L. (2001). Random forests. Mach Learn, 45(1), 5-32. 
-  \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat, 841-860. 
-  \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med, 51(1), 74.
+  \item Wright, M. N. & Ziegler, A. (2017). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. J Stat Softw 77:1-17. \url{http://dx.doi.org/10.18637/jss.v077.i01}.
+  \item Schmid, M., Wright, M. N. & Ziegler, A. (2016). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Syst Appl 63:450-459. \url{http://dx.doi.org/10.1016/j.eswa.2016.07.018}. 
+  \item Wright, M. N., Dankowski, T. & Ziegler, A. (2017). Unbiased split variable selection for random survival forests using maximally selected rank statistics. Stat Med. \url{http://dx.doi.org/10.1002/sim.7212}.
+  \item Breiman, L. (2001). Random forests. Mach Learn, 45(1), 5-32. \url{http://dx.doi.org/10.1023/A:1010933404324}. 
+  \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat 2:841-860. \url{http://dx.doi.org/10.1097/JTO.0b013e318233d835}. 
+  \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med 51:74-81. \url{http://dx.doi.org/10.3414/ME00-01-0052}.
   \item Hastie, T., Tibshirani, R., Friedman, J. (2009). The Elements of Statistical Learning. Springer, New York. 2nd edition.
+  \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \url{http://dx.doi.org/10.1007/s10994-006-6226-1}. 
   }
 }
 \seealso{

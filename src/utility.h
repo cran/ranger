@@ -180,7 +180,7 @@ void drawWithoutReplacementSimple(std::vector<size_t>& result, std::mt19937_64& 
     std::vector<size_t>& skip, size_t num_samples);
 
 /**
- * Knuth's algorithm for sampling without replacement, faster for larger num_samples
+ * Knuth's algorithm for sampling without replacement, faster for larger num_samples. Result is ordered.
  * Idea from Knuth 1985, The Art of Computer Programming, Vol. 2, Sec. 3.4.2 Algorithm S
  * @param result Vector to add results to. Will not be cleaned before filling.
  * @param random_number_generator Random number generator
@@ -189,6 +189,17 @@ void drawWithoutReplacementSimple(std::vector<size_t>& result, std::mt19937_64& 
  * @param num_samples Number of samples to draw
  */
 void drawWithoutReplacementKnuth(std::vector<size_t>& result, std::mt19937_64& random_number_generator, size_t max,
+    std::vector<size_t>& skip, size_t num_samples);
+
+/**
+ * Fisher Yates algorithm for sampling without replacement.
+ * @param result Vector to add results to. Will not be cleaned before filling.
+ * @param random_number_generator Random number generator
+ * @param max Length of range. Interval to draw from: 0..max-1
+ * @param skip Values to skip
+ * @param num_samples Number of samples to draw
+ */
+void drawWithoutReplacementFisherYates(std::vector<size_t>& result, std::mt19937_64& random_number_generator, size_t max,
     std::vector<size_t>& skip, size_t num_samples);
 
 /**
@@ -214,6 +225,29 @@ void drawWithoutReplacementWeighted(std::vector<size_t>& result, std::mt19937_64
     size_t max_index, size_t num_samples, std::vector<double>& weights);
 
 /**
+ * Draw random numbers of a vector without replacement.
+ * @param result Vector to add results to. Will not be cleaned before filling.
+ * @param input Vector to draw values from.
+ * @param random_number_generator Random number generator
+ * @param num_samples Number of samples to draw
+ */
+template<typename T>
+void drawWithoutReplacementFromVector(std::vector<T>& result, std::vector<T>& input,
+    std::mt19937_64& random_number_generator, size_t num_samples) {
+
+  // Draw random indices
+  std::vector<size_t> result_idx;
+  result_idx.reserve(num_samples);
+  std::vector<size_t> skip; // Empty vector (no skip)
+  drawWithoutReplacementSkip(result_idx, random_number_generator, input.size(), skip, num_samples);
+
+  // Add vector values to result
+  for (auto& idx : result_idx) {
+    result.push_back(input[idx]);
+  }
+}
+
+/**
  * Returns the most frequent class index of a vector with counts for the classes. Returns a random class if counts are equal.
  * @param class_count Vector with class counts
  * @param random_number_generator Random number generator
@@ -223,7 +257,7 @@ template<typename T>
 size_t mostFrequentClass(std::vector<T>& class_count, std::mt19937_64 random_number_generator) {
   std::vector<size_t> major_classes;
 
-  // Find maximum count
+// Find maximum count
   T max_count = 0;
   for (size_t i = 0; i < class_count.size(); ++i) {
     T count = class_count[i];
@@ -381,11 +415,11 @@ std::vector<double> adjustPvalues(std::vector<double>& unadjusted_pvalues);
  */
 template<typename T>
 std::vector<size_t> order(std::vector<T>& values, bool decreasing) {
-  // Create index vector
+// Create index vector
   std::vector<size_t> indices(values.size());
   std::iota(indices.begin(), indices.end(), 0);
 
-  // Sort index vector based on value vector
+// Sort index vector based on value vector
   if (decreasing) {
     std::sort(std::begin(indices), std::end(indices), [&](size_t i1, size_t i2) {return values[i1] > values[i2];});
   } else {
@@ -413,10 +447,10 @@ template<typename T>
 std::vector<double> rank(std::vector<T>& values) {
   size_t num_values = values.size();
 
-  // Order
+// Order
   std::vector<size_t> indices = order(values, false);
 
-  // Compute ranks, start at 1
+// Compute ranks, start at 1
   std::vector<double> ranks(num_values);
   size_t reps = 1;
   for (size_t i = 0; i < num_values; i += reps) {

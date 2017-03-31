@@ -32,13 +32,13 @@
 ##' For \code{type = 'response'} (the default), the predicted classes (classification), predicted numeric values (regression), predicted probabilities (probability estimation) or survival probabilities (survival) are returned. 
 ##' For \code{type = 'terminalNodes'}, the IDs of the terminal node in each tree for each observation in the given dataset are returned.
 ##' 
-##' For classification and \code{predict.all = TRUE}, a matrix of factor levels is returned.
+##' For classification and \code{predict.all = TRUE}, a factor levels are returned as numerics.
 ##' To retrieve the corresponding factor levels, use \code{rf$forest$levels}, if \code{rf} is the ranger object.
 ##'
 ##' @title Ranger prediction
 ##' @param object Ranger \code{ranger.forest} object.
 ##' @param data New test data of class \code{data.frame} or \code{gwaa.data} (GenABEL).
-##' @param predict.all Return a matrix with individual predictions for each tree instead of aggregated predictions for all trees (classification and regression only).
+##' @param predict.all Return individual predictions for each tree instead of aggregated predictions for all trees. Return a matrix (sample x tree) for classification and regression, a 3d array for probability estimation (sample x class x tree) and survival (sample x time x tree).
 ##' @param num.trees Number of trees used for prediction. The first \code{num.trees} in the forest are used.
 ##' @param type Type of prediction. One of 'response' or 'terminalNodes' with default 'response'. See below for details.
 ##' @param seed Random seed used in Ranger.
@@ -107,8 +107,18 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   ## Create final data
   if (forest$treetype == "Survival") {
     if (forest$dependent.varID > 0 & forest$status.varID > 1) {
-      ## If alternative interface used, don't subset data
-      data.used <- data
+      if (ncol(data) == length(forest$independent.variable.names)+2) {
+        ## If alternative interface used and same data structure, don't subset data
+        data.used <- data
+      } else if (ncol(data) == length(forest$independent.variable.names)) {
+        data.selected <- subset(data, select = forest$independent.variable.names)
+        data.used <- cbind(0, 0, data.selected)
+        variable.names <- c("time", "status", forest$independent.variable.names)
+        forest$dependent.varID <- 0
+        forest$status.varID <- 1
+      } else {
+        stop("Invalid prediction data. Include both time and status variable or none.")
+      }
     } else {
       ## If formula interface used, subset data
       data.selected <- subset(data, select = forest$independent.variable.names)
@@ -124,7 +134,7 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   } else {
     ## No survival
     if (ncol(data) == length(forest$independent.variable.names)+1 & forest$dependent.varID > 0) {
-      ## If alternative interface used, don't subset data
+      ## If alternative interface used and same data structure, don't subset data
       data.used <- data
     } else {
       ## If formula interface used, subset data
@@ -238,6 +248,7 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   keep.inbag <- FALSE
   sample.fraction <- 1
   holdout <- FALSE
+  num.random.splits <- 1
 
   ## Call Ranger
   result <- rangerCpp(treetype, dependent.variable.name, data.final, variable.names, mtry,
@@ -247,55 +258,73 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
                       status.variable.name, prediction.mode, forest, sparse.data, replace, probability,
                       unordered.factor.variables, use.unordered.factor.variables, save.memory, splitrule,
                       case.weights, use.case.weights, predict.all, keep.inbag, sample.fraction,
-                      alpha, minprop, holdout, prediction.type)
+                      alpha, minprop, holdout, prediction.type, num.random.splits)
 
   if (length(result) == 0) {
     stop("User interrupt or internal error.")
   }
 
   ## Prepare results
-  result$predictions <- drop(do.call(rbind, result$predictions))
   result$num.samples <- nrow(data.final)
   result$treetype <- forest$treetype
 
+  if (predict.all) {
+    if (forest$treetype %in% c("Classification", "Regression")) {
+      result$predictions <- do.call(rbind, result$predictions)
+    } else {
+      ## TODO: Better solution for this?
+      result$predictions <- aperm(array(unlist(result$predictions), 
+                                        dim = rev(c(length(result$predictions), 
+                                                    length(result$predictions[[1]]), 
+                                                    length(result$predictions[[1]][[1]])))))
+    }
+  } else {
+    if (is.list(result$predictions)) {
+      result$predictions <- do.call(rbind, result$predictions)
+    } 
+  }
+  
   if (type == "response") {
     if (forest$treetype == "Classification" & !is.null(forest$levels)) {
       if (!predict.all) {
         result$predictions <- integer.to.factor(result$predictions, forest$levels)
       }
+    } else if (forest$treetype == "Regression") {
+      ## Empty
     } else if (forest$treetype == "Survival") {
       result$unique.death.times <- forest$unique.death.times
       result$chf <- result$predictions
       result$predictions <- NULL
       result$survival <- exp(-result$chf)
     } else if (forest$treetype == "Probability estimation" & !is.null(forest$levels)) {
-      ## Set colnames and sort by levels
-      if (is.matrix(result$predictions)) {
+      if (!predict.all) {
+        if (is.vector(result$predictions)) {
+          result$predictions <- matrix(result$predictions, nrow = 1)
+        }
+        
+        ## Set colnames and sort by levels
         colnames(result$predictions) <- forest$levels[forest$class.values]
-        result$predictions <- result$predictions[, forest$levels]
-      } else {
-        names(result$predictions) <- forest$levels[forest$class.values]
-        result$predictions <- result$predictions[forest$levels]
+        result$predictions <- result$predictions[, forest$levels, drop = FALSE]
       }
     }
-  }
+  } 
 
   class(result) <- "ranger.prediction"
   return(result)
 }
 
 ##' Prediction with new data and a saved forest from Ranger.
-##'
+##' 
 ##' For \code{type = 'response'} (the default), the predicted classes (classification), predicted numeric values (regression), predicted probabilities (probability estimation) or survival probabilities (survival) are returned. 
 ##' For \code{type = 'terminalNodes'}, the IDs of the terminal node in each tree for each observation in the given dataset are returned.
 ##' 
-##' For classification and predict.all = TRUE, a matrix of factor levels is returned.
-##' To retrieve the corresponding factor levels, use rf$forest$levels, if rf is the ranger object.
+##' For classification and \code{predict.all = TRUE}, a factor levels are returned as numerics.
+##' To retrieve the corresponding factor levels, use \code{rf$forest$levels}, if \code{rf} is the ranger object.
 ##'
 ##' @title Ranger prediction
 ##' @param object Ranger \code{ranger} object.
 ##' @param data New test data of class \code{data.frame} or \code{gwaa.data} (GenABEL).
-##' @param predict.all Return a matrix with individual predictions for each tree instead of aggregated predictions for all trees (classification and regression only).
+##' @param predict.all Return individual predictions for each tree instead of aggregated predictions for all trees. Return a matrix (sample x tree) for classification and regression, a 3d array for probability estimation (sample x class x tree) and survival (sample x time x tree).
 ##' @param num.trees Number of trees used for prediction. The first \code{num.trees} in the forest are used.
 ##' @param type Type of prediction. One of 'response' or 'terminalNodes' with default 'response'. See below for details.
 ##' @param seed Random seed used in Ranger.

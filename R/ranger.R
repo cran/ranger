@@ -33,9 +33,10 @@
 ##'
 ##' The tree type is determined by the type of the dependent variable.
 ##' For factors classification trees are grown, for numeric values regression trees and for survival objects survival trees.
-##' The Gini index is used as splitting rule for classification.
+##' The Gini index is used as default splitting rule for classification.
 ##' For regression, the estimated response variances or maximally selected rank statistics (Wright et al. 2016) can be used.
 ##' For Survival the log-rank test, a C-index based splitting rule (Schmid et al. 2015) and maximally selected rank statistics (Wright et al. 2016) are available.
+##' For all tree types, forests of extremely randomized trees (Geurts et al. 2006) can be grown.
 ##'
 ##' With the \code{probability} option and factor dependent variable a probability forest is grown.
 ##' Here, the node impurity is used for splitting, as in classification forests.
@@ -75,7 +76,7 @@
 ##' If you compile yourself, the new RTools toolchain is required.
 ##' 
 ##' @title Ranger
-##' @param formula Object of class \code{formula} or \code{character} describing the model to fit.
+##' @param formula Object of class \code{formula} or \code{character} describing the model to fit. Interaction terms supported only for numerical variables.
 ##' @param data Training data of class \code{data.frame}, \code{matrix} or \code{gwaa.data} (GenABEL).
 ##' @param num.trees Number of trees.
 ##' @param mtry Number of variables to possibly split at in each node. Default is the (rounded down) square root of the number variables. 
@@ -86,12 +87,13 @@
 ##' @param replace Sample with replacement. 
 ##' @param sample.fraction Fraction of observations to sample. Default is 1 for sampling with replacement and 0.632 for sampling without replacement. 
 ##' @param case.weights Weights for sampling of training observations. Observations with larger weights will be selected with higher probability in the bootstrap (or subsampled) samples for the trees.
-##' @param splitrule Splitting rule, regression and survival only. For regression one of "variance" or "maxstat" with default "variance". For survival "logrank", "C" or "maxstat" with default "logrank". 
+##' @param splitrule Splitting rule. For classification and probability estimation "gini" or "extratrees" with default "gini". For regression "variance", "extratrees" or "maxstat" with default "variance". For survival "logrank", "extratrees", "C" or "maxstat" with default "logrank". 
+##' @param num.random.splits For "extratrees" splitrule.: Number of random splits to consider for each candidate splitting variable.
 ##' @param alpha For "maxstat" splitrule: Significance threshold to allow splitting.
 ##' @param minprop For "maxstat" splitrule: Lower quantile of covariate distribtuion to be considered for splitting.
 ##' @param split.select.weights Numeric vector with weights between 0 and 1, representing the probability to select variables for splitting. Alternatively, a list of size num.trees, containing split select weight vectors for each tree can be used.  
 ##' @param always.split.variables Character vector with variable names to be always selected in addition to the \code{mtry} variables tried for splitting.
-##' @param respect.unordered.factors Handling of unordered factor covariates. One of 'ignore', 'order' and 'partition' with default 'ignore'. Alternatively TRUE (='order') or FALSE (='ignore') can be used. See below for details. 
+##' @param respect.unordered.factors Handling of unordered factor covariates. One of 'ignore', 'order' and 'partition'. For the "extratrees" splitrule the default is "partition" for all other splitrules 'ignore'. Alternatively TRUE (='order') or FALSE (='ignore') can be used. See below for details. 
 ##' @param scale.permutation.importance Scale permutation importance by standard error as in (Breiman 2001). Only applicable if permutation variable importance mode selected.
 ##' @param keep.inbag Save how often observations are in-bag in each tree. 
 ##' @param holdout Hold-out mode. Hold-out all samples with case weight 0 and use these for variable importance and prediction error.
@@ -107,7 +109,7 @@
 ##'   \item{\code{predictions}}{Predicted classes/values, based on out of bag samples (classification and regression only).}
 ##'   \item{\code{variable.importance}}{Variable importance for each independent variable.}
 ##'   \item{\code{prediction.error}}{Overall out of bag prediction error. For classification this is the fraction of missclassified samples, for regression the mean squared error and for survival one minus Harrell's c-index.}
-##'   \item{\code{r.squared}}{R squared. Also called explained variance or coefficient of determination (regression only).}
+##'   \item{\code{r.squared}}{R squared. Also called explained variance or coefficient of determination (regression only). Computed on out of bag data.}
 ##'   \item{\code{confusion.matrix}}{Contingency table for classes and predictions based on out of bag samples (classification only).}
 ##'   \item{\code{unique.death.times}}{Unique death times (survival only).}
 ##'   \item{\code{chf}}{Estimated cumulative hazard function for each sample (survival only).}
@@ -160,14 +162,14 @@
 ##' @author Marvin N. Wright
 ##' @references
 ##' \itemize{
-##'   \item Wright, M. N. & Ziegler, A. (2016). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. Journal of Statistical Software, in press. \url{http://arxiv.org/abs/1508.04409}.
-##'   \item Schmid, M., Wright, M. N. & Ziegler, A. (2015). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Systems with Applications 63:450-459. \url{http://dx.doi.org/10.1016/j.eswa.2016.07.018}. 
-##'   \item Wright, M. N., Dankowski, T. & Ziegler, A. (2016). Random forests for survival analysis using maximally selected rank statistics. Technical Report. \url{http://arxiv.org/abs/1605.03391}.
-##' 
-##'   \item Breiman, L. (2001). Random forests. Mach Learn, 45(1), 5-32. 
-##'   \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat, 841-860. 
-##'   \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med, 51(1), 74.
+##'   \item Wright, M. N. & Ziegler, A. (2017). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. J Stat Softw 77:1-17. \url{http://dx.doi.org/10.18637/jss.v077.i01}.
+##'   \item Schmid, M., Wright, M. N. & Ziegler, A. (2016). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Syst Appl 63:450-459. \url{http://dx.doi.org/10.1016/j.eswa.2016.07.018}. 
+##'   \item Wright, M. N., Dankowski, T. & Ziegler, A. (2017). Unbiased split variable selection for random survival forests using maximally selected rank statistics. Stat Med. \url{http://dx.doi.org/10.1002/sim.7212}.
+##'   \item Breiman, L. (2001). Random forests. Mach Learn, 45(1), 5-32. \url{http://dx.doi.org/10.1023/A:1010933404324}. 
+##'   \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat 2:841-860. \url{http://dx.doi.org/10.1097/JTO.0b013e318233d835}. 
+##'   \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med 51:74-81. \url{http://dx.doi.org/10.3414/ME00-01-0052}.
 ##'   \item Hastie, T., Tibshirani, R., Friedman, J. (2009). The Elements of Statistical Learning. Springer, New York. 2nd edition.
+##'   \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \url{http://dx.doi.org/10.1007/s10994-006-6226-1}. 
 ##'   }
 ##' @seealso \code{\link{predict.ranger}}
 ##' @useDynLib ranger
@@ -179,10 +181,10 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                    importance = "none", write.forest = TRUE, probability = FALSE,
                    min.node.size = NULL, replace = TRUE, 
                    sample.fraction = ifelse(replace, 1, 0.632), 
-                   case.weights = NULL, 
-                   splitrule = NULL, alpha = 0.5, minprop = 0.1,
+                   case.weights = NULL, splitrule = NULL, 
+                   num.random.splits = 1, alpha = 0.5, minprop = 0.1,
                    split.select.weights = NULL, always.split.variables = NULL,
-                   respect.unordered.factors = "ignore",
+                   respect.unordered.factors = NULL,
                    scale.permutation.importance = FALSE,
                    keep.inbag = FALSE, holdout = FALSE,
                    num.threads = NULL, save.memory = FALSE,
@@ -205,13 +207,6 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     gwa.mode <- FALSE
   }
   
-  ## Check missing values
-  if (any(is.na(data))) {
-    offending_columns <- colnames(data)[colSums(is.na(data)) > 0]
-    stop("Missing data in columns: ",
-         paste0(offending_columns, collapse = ", "), ".", call. = FALSE)
-  }
-  
   ## Formula interface. Use whole data frame is no formula provided and depvarname given
   if (is.null(formula)) {
     if (is.null(dependent.variable.name)) {
@@ -229,8 +224,15 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     if (class(formula) != "formula") {
       stop("Error: Invalid formula.")
     }
-    data.selected <- model.frame(formula, data, na.action = na.fail)
-    response <- data.selected[[1]]
+    data.selected <- parse.formula(formula, data)
+    response <- data.selected[, 1]
+  }
+  
+  ## Check missing values
+  if (any(is.na(data.selected))) {
+    offending_columns <- colnames(data.selected)[colSums(is.na(data.selected)) > 0]
+    stop("Missing data in columns: ",
+         paste0(offending_columns, collapse = ", "), ".", call. = FALSE)
   }
   
   ## Treetype
@@ -269,7 +271,16 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                                                           colnames(data.selected) != status.variable.name]
   }
   
-  ## Old version of if respect.unordered.factors
+  ## respect.unordered.factors
+  if (is.null(respect.unordered.factors)) {
+    if (!is.null(splitrule) && splitrule == "extratrees") {
+      respect.unordered.factors <- "partition"
+    } else {
+      respect.unordered.factors <- "ignore"
+    }
+  }
+
+  ## Old version of respect.unordered.factors
   if (respect.unordered.factors == TRUE) {
     respect.unordered.factors <- "order"
   } else if (respect.unordered.factors == FALSE) {
@@ -487,6 +498,8 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     } else {
       stop("Error: maxstat splitrule applicable to regression or survival data only.")
     }
+  } else if (splitrule == "extratrees") {
+    splitrule.num <- 5
   } else {
     stop("Error: Unknown splitrule.")
   }
@@ -497,6 +510,14 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   }
   if (minprop < 0 | minprop > 0.5) {
     stop("Error: Invalid value for minprop, please give a value between 0 and 0.5.")
+  }
+
+  ## Extra trees
+  if (!is.numeric(num.random.splits) | num.random.splits < 1) {
+    stop("Error: Invalid value for num.random.splits, please give a positive integer.")
+  }
+  if (splitrule.num == 5 & save.memory & respect.unordered.factors == "partition") {
+    stop("Error: save.memory option not possible in extraTrees mode with unordered predictors.")
   }
 
   ## Unordered factors  
@@ -511,7 +532,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
       use.unordered.factor.variables <- TRUE
       ## Check level count
       num.levels <- sapply(data.selected[, factor.idx & !ordered.idx & independent.idx, drop = FALSE], nlevels)
-      max.level.count <- 8*.Machine$sizeof.pointer - 1
+      max.level.count <- .Machine$double.digits
       if (max(num.levels) > max.level.count) {
         stop(paste("Too many levels in unordered categorical variable ", unordered.factor.variables[which.max(num.levels)], 
                    ". Only ", max.level.count, " levels allowed on this system. Consider using the 'order' option.", sep = ""))
@@ -569,18 +590,18 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                       status.variable.name, prediction.mode, loaded.forest, sparse.data,
                       replace, probability, unordered.factor.variables, use.unordered.factor.variables, 
                       save.memory, splitrule.num, case.weights, use.case.weights, predict.all, 
-                      keep.inbag, sample.fraction, alpha, minprop, holdout, prediction.type)
+                      keep.inbag, sample.fraction, alpha, minprop, holdout, prediction.type, 
+                      num.random.splits)
   
   if (length(result) == 0) {
     stop("User interrupt or internal error.")
   }
   
   ## Prepare results
-  result$predictions <- drop(do.call(rbind, result$predictions))
   if (importance.mode != 0) {
     names(result$variable.importance) <- all.independent.variable.names
   }
-  
+
   ## Set predictions
   if (treetype == 1 & is.factor(response)) {
     result$predictions <- integer.to.factor(result$predictions,
@@ -589,13 +610,26 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                                      levels(response))
     result$confusion.matrix <- table(true.values, result$predictions, dnn = c("true", "predicted"))
   } else if (treetype == 5) {
+    if (is.list(result$predictions)) {
+      result$predictions <- do.call(rbind, result$predictions)
+    } 
+    if (is.vector(result$predictions)) {
+      result$predictions <- matrix(result$predictions, nrow = 1)
+    }
     result$chf <- result$predictions
     result$predictions <- NULL
     result$survival <- exp(-result$chf)
   } else if (treetype == 9 & !is.matrix(data)) {
+    if (is.list(result$predictions)) {
+      result$predictions <- do.call(rbind, result$predictions)
+    } 
+    if (is.vector(result$predictions)) {
+      result$predictions <- matrix(result$predictions, nrow = 1)
+    }
+    
     ## Set colnames and sort by levels
     colnames(result$predictions) <- unique(response)
-    result$predictions <- result$predictions[, levels(droplevels(response))]
+    result$predictions <- result$predictions[, levels(droplevels(response)), drop = FALSE]
   }
   
   ## Splitrule
@@ -622,7 +656,9 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   
   ## Write forest object
   if (write.forest) {
-    result$forest$levels <- levels(response)
+    if (is.factor(response)) {
+      result$forest$levels <- levels(droplevels(response))
+    }
     result$forest$independent.variable.names <- independent.variable.names
     result$forest$treetype <- result$treetype
     class(result$forest) <- "ranger.forest"
