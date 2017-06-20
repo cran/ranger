@@ -21,9 +21,9 @@
  Universität zu Lübeck
  Ratzeburger Allee 160
  23562 Lübeck
+ Germany
 
  http://www.imbs-luebeck.de
- wright@imbs.uni-luebeck.de
  #-------------------------------------------------------------------------------*/
 
 #include <algorithm>
@@ -62,7 +62,7 @@ void TreeSurvival::initInternal() {
   num_samples_at_risk = new size_t[num_timepoints];
 }
 
-void TreeSurvival::appendToFileInternal(std::ofstream& file) {
+void TreeSurvival::appendToFileInternal(std::ofstream& file) {  // #nocov start
 
   // Convert to vector without empty elements and save
   std::vector<size_t> terminal_nodes;
@@ -75,7 +75,7 @@ void TreeSurvival::appendToFileInternal(std::ofstream& file) {
   }
   saveVector1D(terminal_nodes, file);
   saveVector2D(chf_vector, file);
-}
+} // #nocov end
 
 void TreeSurvival::createEmptyNodeInternal() {
   chf.push_back(std::vector<double>());
@@ -387,6 +387,11 @@ void TreeSurvival::findBestSplitValueLogRank(size_t nodeID, size_t varID, double
       best_value = (possible_split_values[i] + possible_split_values[i + 1]) / 2;
       best_varID = varID;
       best_logrank = logrank;
+
+      // Use smaller value if average is numerically the same as the larger value
+      if (best_value == possible_split_values[i + 1]) {
+        best_value = possible_split_values[i];
+      }
     }
   }
 
@@ -559,6 +564,11 @@ void TreeSurvival::findBestSplitValueAUC(size_t nodeID, size_t varID, double& be
         best_value = (possible_split_values[i] + possible_split_values[i + 1]) / 2;
         best_varID = varID;
         best_auc = auc;
+
+        // Use smaller value if average is numerically the same as the larger value
+        if (best_value == possible_split_values[i + 1]) {
+          best_value = possible_split_values[i];
+        }
       }
     }
   }

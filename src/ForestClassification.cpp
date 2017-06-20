@@ -21,9 +21,9 @@
  Universität zu Lübeck
  Ratzeburger Allee 160
  23562 Lübeck
+ Germany
 
  http://www.imbs-luebeck.de
- wright@imbs.uni-luebeck.de
  #-------------------------------------------------------------------------------*/
 
 #include <unordered_map>
@@ -187,6 +187,7 @@ void ForestClassification::computePredictionErrorInternal() {
   overall_prediction_error = (double) num_missclassifications / (double) num_predictions;
 }
 
+// #nocov start
 void ForestClassification::writeOutputInternal() {
   *verbose_out << "Tree type:                         " << "Classification" << std::endl;
 }
@@ -323,4 +324,4 @@ void ForestClassification::loadFromFileInternal(std::ifstream& infile) {
     trees.push_back(tree);
   }
 }
-
+// #nocov end

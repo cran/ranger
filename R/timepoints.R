@@ -24,7 +24,6 @@
 # Germany
 #
 # http://www.imbs-luebeck.de
-# wright@imbs.uni-luebeck.de
 # -------------------------------------------------------------------------------
 
 ##' @export
@@ -41,7 +40,7 @@ timepoints <- function(x, ...)  UseMethod("timepoints")
 ##' @author Marvin N. Wright
 ##' @export
 timepoints.ranger.prediction <- function(x, ...) {
-  if (class(x) != "ranger.predicton") {
+  if (class(x) != "ranger.prediction") {
     stop("Object ist no ranger.prediction object.")
   }
   if (x$treetype != "Survival") {

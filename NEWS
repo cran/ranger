@@ -1,3 +1,9 @@
+##### Version 0.8.0
+* Handle sparse data of class Matrix::dgCMatrix
+* Add prediction of standard errors to predict()
+* Allow devtools::install_github() without subdir and on Windows
+* Bug fixes
+
 ##### Version 0.7.0
 * Add randomized splitting (extraTrees)
 * Better formula interface: Support interactions terms and faster computation

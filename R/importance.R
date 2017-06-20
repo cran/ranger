@@ -24,7 +24,6 @@
 # Germany
 #
 # http://www.imbs-luebeck.de
-# wright@imbs.uni-luebeck.de
 # -------------------------------------------------------------------------------
 
 ##' @export
@@ -45,7 +44,7 @@ importance.ranger <- function(x, ...) {
   if (class(x) != "ranger") {
     stop("Object ist no ranger object.")
   }
-  if (is.null(x$variable.importance) | length(x$variable.importance) < 1) {
+  if (is.null(x$variable.importance) || length(x$variable.importance) < 1) {
     stop("No variable importance found. Please use 'importance' option when growing the forest.")
   }
   return(x$variable.importance)
@@ -72,7 +71,7 @@ importance_pvalues <- function(x, method = c("janitza", "altmann"), num.permutat
   if (class(x) != "ranger" & class(x) != "holdoutRF") {
     stop("Object is no ranger or holdoutRF object.")
   }
-  if (x$importance.mode == "none" | is.null(x$variable.importance) | length(x$variable.importance) < 1) {
+  if (x$importance.mode == "none" || is.null(x$variable.importance) || length(x$variable.importance) < 1) {
     stop("No variable importance found. Please use 'importance' option when growing the forest.")
   }
 
@@ -80,7 +79,7 @@ importance_pvalues <- function(x, method = c("janitza", "altmann"), num.permutat
     if (x$importance.mode == "impurity") {
       stop("Impurity variable importance found. Please use (hold-out) permutation importance to use this method.")
     }
-    if (class(x) != "holdoutRF" & x$importance.mode == "permutation") {
+    if (class(x) != "holdoutRF" && x$importance.mode == "permutation") {
       warning("Permutation variable importance found, inaccurate p-values. Please use hold-out permutation importance to use this method.")
     }
     if (x$treetype != "Classification") {
@@ -93,10 +92,7 @@ importance_pvalues <- function(x, method = c("janitza", "altmann"), num.permutat
     vimp <- c(m1, -m1, m2)
     
     ## Compute p-value
-    #pval <- 1 - ecdf(vimp)(x$variable.importance)
-    pval <- sapply(x$variable.importance, function(y) {
-      (sum(vimp >= y) + 1)/(length(vimp) + 1)
-    })
+    pval <- 1 - ecdf(vimp)(x$variable.importance)
     
     ## TODO: 100 ok? increase? 
     if (length(m1) == 0) {
@@ -109,23 +105,24 @@ importance_pvalues <- function(x, method = c("janitza", "altmann"), num.permutat
     if (class(x) != "ranger") {
       stop("Altmann method not available for holdoutRF objects.")
     }
-    if (is.null(formula) | is.null(data)) {
+    if (is.null(formula) || is.null(data)) {
       stop("Formula and data required for the 'altmann' method.")
     }
     
     ## Permute and compute importance again
-    dependent.variable.name <- all.vars(formula)[1]
+    if (x$treetype == "Survival") {
+      dependent.variable.name <- all.vars(formula)[1:2]
+    } else {
+      dependent.variable.name <- all.vars(formula)[1]
+    }
     vimp <- replicate(num.permutations, {
       dat <- data
-      dat[, dependent.variable.name] <- sample(dat[, dependent.variable.name])
+      dat[, dependent.variable.name] <- dat[sample(nrow(dat)), dependent.variable.name]
       ranger(formula, dat, num.trees = x$num.trees, mtry = x$mtry, min.node.size = x$min.node.size, 
              importance = x$importance.mode, ...)$variable.importance
     })
     
     ## Compute p-value
-    # pval <- sapply(1:nrow(vimp), function(i) {
-    #   1 - ecdf(vimp[i, ])(x$variable.importance[i])
-    # })
     pval <- sapply(1:nrow(vimp), function(i) {
       (sum(vimp[i, ] >= x$variable.importance[i]) + 1)/(ncol(vimp) + 1)
     })
