@@ -10,9 +10,9 @@ rg.class <- ranger(Species ~ ., data = iris, verbose = FALSE, write.forest = TRU
 rg.mat   <- ranger(dependent.variable.name = "Species", data = dat, write.forest = TRUE, classification = TRUE)
 
 ## Basic tests (for all random forests equal)
-test_that("classification result is of class ranger with 13 elements", {
+test_that("classification result is of class ranger with 15 elements", {
   expect_is(rg.class, "ranger")
-  expect_equal(length(rg.class), 14)
+  expect_equal(length(rg.class), 15)
 })
 
 test_that("classification prediction returns factor", {
@@ -126,6 +126,12 @@ test_that("confusion matrix rows are the true classes", {
                as.numeric(table(iris$Species)))
 })
 
+test_that("confusion matrix rows are the true classes if using case weights", {
+  rf <- ranger(Species ~ ., data = iris, num.trees = 5, 
+               case.weights = c(rep(100, 5), rep(5, 145)))
+  expect_equal(as.numeric(rowSums(rf$confusion.matrix)), 
+               as.numeric(table(iris$Species)))
+})
 ## Splitrule
 test_that("default splitrule is Gini for classification", {
   set.seed(42)
@@ -180,4 +186,11 @@ test_that("Working with numerically almost exact splitting values", {
                     z = c(1.7629414498915687570246291215880773, 
                           1.7629414498915689790692340466193854))
   expect_silent(ranger(a ~ ., data = dat, num.threads = 1, num.trees = 1))
+})
+
+test_that("No error if unused factor levels in outcome", {
+  expect_warning(rf <- ranger(Species ~ ., iris[1:100, ], num.trees = 5),
+                 "^Dropped unused factor level\\(s\\) in dependent variable\\: virginica\\.")
+  pred <- predict(rf, iris)
+  expect_equal(levels(pred$predictions), levels(droplevels(iris[1:100, "Species"])))
 })

@@ -11,20 +11,21 @@ ranger(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   alpha = 0.5, minprop = 0.1, split.select.weights = NULL,
   always.split.variables = NULL, respect.unordered.factors = NULL,
   scale.permutation.importance = FALSE, keep.inbag = FALSE,
-  holdout = FALSE, num.threads = NULL, save.memory = FALSE,
-  verbose = TRUE, seed = NULL, dependent.variable.name = NULL,
-  status.variable.name = NULL, classification = NULL)
+  holdout = FALSE, quantreg = FALSE, num.threads = NULL,
+  save.memory = FALSE, verbose = TRUE, seed = NULL,
+  dependent.variable.name = NULL, status.variable.name = NULL,
+  classification = NULL)
 }
 \arguments{
 \item{formula}{Object of class \code{formula} or \code{character} describing the model to fit. Interaction terms supported only for numerical variables.}
 
-\item{data}{Training data of class \code{data.frame}, \code{matrix} or \code{gwaa.data} (GenABEL).}
+\item{data}{Training data of class \code{data.frame}, \code{matrix}, \code{dgCMatrix} (Matrix) or \code{gwaa.data} (GenABEL).}
 
 \item{num.trees}{Number of trees.}
 
 \item{mtry}{Number of variables to possibly split at in each node. Default is the (rounded down) square root of the number variables.}
 
-\item{importance}{Variable importance mode, one of 'none', 'impurity', 'permutation'. The 'impurity' measure is the Gini index for classification and the variance of the responses for regression. For survival, only 'permutation' is available.}
+\item{importance}{Variable importance mode, one of 'none', 'impurity', 'impurity_corrected', 'permutation'. The 'impurity' measure is the Gini index for classification, the variance of the responses for regression and the sum of test statistics (see \code{splitrule}) for survival.}
 
 \item{write.forest}{Save \code{ranger.forest} object, required for prediction. Set to \code{FALSE} to reduce memory usage if no prediction intended.}
 
@@ -44,7 +45,7 @@ ranger(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
 
 \item{alpha}{For "maxstat" splitrule: Significance threshold to allow splitting.}
 
-\item{minprop}{For "maxstat" splitrule: Lower quantile of covariate distribtuion to be considered for splitting.}
+\item{minprop}{For "maxstat" splitrule: Lower quantile of covariate distribution to be considered for splitting.}
 
 \item{split.select.weights}{Numeric vector with weights between 0 and 1, representing the probability to select variables for splitting. Alternatively, a list of size num.trees, containing split select weight vectors for each tree can be used.}
 
@@ -58,13 +59,15 @@ ranger(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
 
 \item{holdout}{Hold-out mode. Hold-out all samples with case weight 0 and use these for variable importance and prediction error.}
 
+\item{quantreg}{Prepare quantile prediction as in quantile regression forests (Meinshausen 2006). Regression only. Set \code{keep.inbag = TRUE} to prepare out-of-bag quantile prediction.}
+
 \item{num.threads}{Number of threads. Default is number of CPUs available.}
 
 \item{save.memory}{Use memory saving (but slower) splitting mode. No effect for survival and GWAS data. Warning: This option slows down the tree growing, use only if you encounter memory problems.}
 
 \item{verbose}{Show computation status and estimated runtime.}
 
-\item{seed}{Random seed. Default is \code{NULL}, which generates the seed from \code{R}.}
+\item{seed}{Random seed. Default is \code{NULL}, which generates the seed from \code{R}. Set to \code{0} to ignore the \code{R} seed.}
 
 \item{dependent.variable.name}{Name of dependent variable, needed if no formula given. For survival forests this is the time variable.}
 
@@ -77,7 +80,7 @@ Object of class \code{ranger} with elements
   \item{\code{forest}}{Saved forest (If write.forest set to TRUE). Note that the variable IDs in the \code{split.varIDs} object do not necessarily represent the column number in R.}
   \item{\code{predictions}}{Predicted classes/values, based on out of bag samples (classification and regression only).}
   \item{\code{variable.importance}}{Variable importance for each independent variable.}
-  \item{\code{prediction.error}}{Overall out of bag prediction error. For classification this is the fraction of missclassified samples, for regression the mean squared error and for survival one minus Harrell's c-index.}
+  \item{\code{prediction.error}}{Overall out of bag prediction error. For classification this is the fraction of missclassified samples, for probability estimation and regression the mean squared error and for survival one minus Harrell's C-index.}
   \item{\code{r.squared}}{R squared. Also called explained variance or coefficient of determination (regression only). Computed on out of bag data.}
   \item{\code{confusion.matrix}}{Contingency table for classes and predictions based on out of bag samples (classification only).}
   \item{\code{unique.death.times}}{Unique death times (survival only).}
@@ -97,6 +100,7 @@ Object of class \code{ranger} with elements
 Ranger is a fast implementation of Random Forest (Breiman 2001) or recursive partitioning, particularly suited for high dimensional data.
 Classification, regression, and survival forests are supported.
 Classification and regression forests are implemented as in the original Random Forest (Breiman 2001), survival forests as in Random Survival Forests (Ishwaran et al. 2008).
+Includes implementations of extremely randomized trees (Geurts et al. 2006) and qunatile regression forests (Meinshausen 2006).
 }
 \details{
 The tree type is determined by the type of the dependent variable.
@@ -114,7 +118,7 @@ For details see Malley et al. (2012).
 
 Note that for classification and regression nodes with size smaller than \code{min.node.size} can occur, as in original Random Forests.
 For survival all nodes contain at \code{min.node.size} samples. 
-Variables selected with \code{always.split.variables} are tried additionaly to the mtry variables randomly selected.
+Variables selected with \code{always.split.variables} are tried additionally to the mtry variables randomly selected.
 In \code{split.select.weights} variables weighted with 0 are never selected and variables with 1 are always selected. 
 Weights do not need to sum up to 1, they will be normalized later. 
 The weights are assigned to the variables in the order they appear in the formula or in the data if no formula is used.
@@ -153,9 +157,14 @@ ranger(Species ~ ., data = iris)
 train.idx <- sample(nrow(iris), 2/3 * nrow(iris))
 iris.train <- iris[train.idx, ]
 iris.test <- iris[-train.idx, ]
-rg.iris <- ranger(Species ~ ., data = iris.train, write.forest = TRUE)
-pred.iris <- predict(rg.iris, dat = iris.test)
+rg.iris <- ranger(Species ~ ., data = iris.train)
+pred.iris <- predict(rg.iris, data = iris.test)
 table(iris.test$Species, pred.iris$predictions)
+
+## Quantile regression forest
+rf <- ranger(mpg ~ ., mtcars[1:26, ], quantreg = TRUE)
+pred <- predict(rf, mtcars[27:32, ], type = "quantiles")
+pred$predictions
 
 ## Variable importance
 rg.iris <- ranger(Species ~ ., data = iris, importance = "impurity")
@@ -189,7 +198,8 @@ ranger(trait ~ ., data = dat.gwaa)
   \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat 2:841-860. \url{http://dx.doi.org/10.1097/JTO.0b013e318233d835}. 
   \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med 51:74-81. \url{http://dx.doi.org/10.3414/ME00-01-0052}.
   \item Hastie, T., Tibshirani, R., Friedman, J. (2009). The Elements of Statistical Learning. Springer, New York. 2nd edition.
-  \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \url{http://dx.doi.org/10.1007/s10994-006-6226-1}. 
+  \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \url{http://dx.doi.org/10.1007/s10994-006-6226-1}.
+  \item Meinshausen (2006). Quantile Regression Forests. J Mach Learn Res 7:983-999. \url{http://www.jmlr.org/papers/v7/meinshausen06a.html}.  
   }
 }
 \seealso{

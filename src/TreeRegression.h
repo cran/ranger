@@ -38,11 +38,11 @@ public:
 
   // Create from loaded forest
   TreeRegression(std::vector<std::vector<size_t>>& child_nodeIDs, std::vector<size_t>& split_varIDs,
-      std::vector<double>& split_values, std::vector<bool>* is_ordered_variable);
+      std::vector<double>& split_values);
 
   virtual ~TreeRegression();
 
-  void initInternal();
+  void allocateMemory();
 
   double estimate(size_t nodeID);
   void computePermutationImportanceInternal(std::vector<std::vector<size_t>>* permutations);

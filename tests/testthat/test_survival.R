@@ -9,9 +9,9 @@ rg.surv <- ranger(Surv(time, status) ~ ., data = veteran, verbose = FALSE,
                   write.forest = TRUE, num.trees = 10)
 
 ## Basic tests (for all random forests equal)
-test_that("survival result is of class ranger with 15 elements", {
+test_that("survival result is of class ranger with 16 elements", {
   expect_is(rg.surv, "ranger")
-  expect_equal(length(rg.surv), 15)
+  expect_equal(length(rg.surv), 16)
 })
 
 test_that("results have right number of trees", {
@@ -113,4 +113,9 @@ test_that("timepoints() working on survival forest only", {
   
   pred <- predict(rf, iris)
   expect_error(timepoints(pred), "No timepoints found. Object is no Survival prediction object.")
+})
+
+test_that("Survival error without covariates", {
+  expect_error(ranger(Surv(time, status) ~ ., veteran[, c("time", "status")], num.trees = 5), 
+               "Error: No covariates found.")
 })

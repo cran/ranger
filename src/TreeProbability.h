@@ -41,11 +41,11 @@ public:
   // Create from loaded forest
   TreeProbability(std::vector<std::vector<size_t>>& child_nodeIDs, std::vector<size_t>& split_varIDs,
       std::vector<double>& split_values, std::vector<double>* class_values, std::vector<uint>* response_classIDs,
-      std::vector<std::vector<double>>& terminal_class_counts, std::vector<bool>* is_ordered_variable);
+      std::vector<std::vector<double>>& terminal_class_counts);
 
   virtual ~TreeProbability();
 
-  void initInternal();
+  void allocateMemory();
 
   void addToTerminalNodes(size_t nodeID);
   void computePermutationImportanceInternal(std::vector<std::vector<size_t>>* permutations);

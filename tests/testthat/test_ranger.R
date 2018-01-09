@@ -10,9 +10,9 @@ if (!requireNamespace("GenABEL", quietly = TRUE)) {
   rg.gwaa <- ranger(CHD ~ ., data = dat.gwaa, verbose = FALSE, write.forest = TRUE)
 }
 
-test_that("classification gwaa rf is of class ranger with 13 elements", {
+test_that("classification gwaa rf is of class ranger with 15 elements", {
   expect_is(rg.gwaa, "ranger")
-  expect_equal(length(rg.gwaa), 14)
+  expect_equal(length(rg.gwaa), 15)
 })
 
 test_that("Matrix interface works for Probability estimation", {
@@ -72,10 +72,6 @@ test_that("holdout mode: no OOB prediction if no 0 weights", {
                case.weights = weights, replace = FALSE, 
                holdout = TRUE, keep.inbag = TRUE)
   expect_true(all(is.na(rf$predictions)))
-})
-
-test_that("Probability estimation works for empty classes", {
-  expect_silent(rf <- ranger(Species ~., iris[1:100,],  num.trees = 5, probability = TRUE))
 })
 
 test_that("OOB error is correct for 1 tree, classification", {
@@ -202,4 +198,18 @@ test_that("Split points are at (A+B)/2 for numeric features, survival maxstat sp
   rf$forest$split.values
   )
   expect_equal(split_points, rep(0.5, rf$num.trees))
+})
+
+test_that("No error if variable named forest", {
+  dat <- iris
+  dat$forest <- rnorm(150)
+  rf <- ranger(Species ~ ., dat, num.trees = 5)
+  expect_silent(predict(rf, dat))
+})
+
+test_that("GenABEL prediction works if no covariates and formula used", {
+  dat <- dat.gwaa
+  dat@phdata$Age <- NULL
+  rf <- ranger(CHD ~ .-Sex, data = dat, num.trees = 5)
+  expect_silent(predict(rf, dat))
 })

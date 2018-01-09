@@ -123,21 +123,18 @@ public:
   size_t getNumTrees() const {
     return num_trees;
   }
-  uint getMtry() const
-  {
+  uint getMtry() const {
     return mtry;
   }
-  uint getMinNodeSize() const
-  {
+  uint getMinNodeSize() const {
     return min_node_size;
   }
-  size_t getNumIndependentVariables() const
-  {
+  size_t getNumIndependentVariables() const {
     return num_independent_variables;
   }
-  const std::vector<bool>& getIsOrderedVariable() const
-  {
-    return is_ordered_variable;
+
+  const std::vector<bool>& getIsOrderedVariable() const {
+    return data->getIsOrderedVariable();
   }
 
   std::vector<std::vector<size_t>> getInbagCounts() const {
@@ -154,7 +151,8 @@ protected:
 
   // Predict using existing tree from file and data as prediction data
   void predict();
-  virtual void predictInternal() = 0;
+  virtual void allocatePredictMemory() = 0;
+  virtual void predictInternal(size_t sample_idx) = 0;
 
   void computePredictionError();
   virtual void computePredictionErrorInternal() = 0;
@@ -164,6 +162,7 @@ protected:
   // Multithreading methods for growing/prediction/importance, called by each thread
   void growTreesInThread(uint thread_idx, std::vector<double>* variable_importance);
   void predictTreesInThread(uint thread_idx, const Data* prediction_data, bool oob_prediction);
+  void predictInternalInThread(uint thread_idx);
   void computeTreePermutationImportanceInThread(uint thread_idx, std::vector<double>* importance, std::vector<double>* variance);
 
   // Load forest from file
@@ -207,12 +206,6 @@ protected:
   // MAXSTAT splitrule
   double alpha;
   double minprop;
-
-  // For each varID true if ordered
-  std::vector<bool> is_ordered_variable;
-
-  // Variable to not split at (only dependent_varID for non-survival forests)
-  std::vector<size_t> no_split_variables;
 
   // Multithreading
   uint num_threads;

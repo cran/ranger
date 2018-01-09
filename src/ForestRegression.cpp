@@ -48,13 +48,12 @@ void ForestRegression::loadForest(size_t dependent_varID, size_t num_trees,
 
   this->dependent_varID = dependent_varID;
   this->num_trees = num_trees;
-  this->is_ordered_variable = is_ordered_variable;
+  data->setIsOrderedVariable(is_ordered_variable);
 
   // Create trees
   trees.reserve(num_trees);
   for (size_t i = 0; i < num_trees; ++i) {
-    Tree* tree = new TreeRegression(forest_child_nodeIDs[i], forest_split_varIDs[i], forest_split_values[i],
-        &this->is_ordered_variable);
+    Tree* tree = new TreeRegression(forest_child_nodeIDs[i], forest_split_varIDs[i], forest_split_values[i]);
     trees.push_back(tree);
   }
 
@@ -88,36 +87,35 @@ void ForestRegression::growInternal() {
   }
 }
 
-void ForestRegression::predictInternal() {
-
+void ForestRegression::allocatePredictMemory() {
   size_t num_prediction_samples = data->getNumRows();
   if (predict_all || prediction_type == TERMINALNODES) {
-    predictions = std::vector<std::vector<std::vector<double>>>(1, std::vector<std::vector<double>>(num_prediction_samples, std::vector<double>(num_trees)));
+    predictions = std::vector<std::vector<std::vector<double>>>(1,
+        std::vector<std::vector<double>>(num_prediction_samples, std::vector<double>(num_trees)));
   } else {
-    predictions = std::vector<std::vector<std::vector<double>>>(1, std::vector<std::vector<double>>(1, std::vector<double>(num_prediction_samples)));
+    predictions = std::vector<std::vector<std::vector<double>>>(1,
+        std::vector<std::vector<double>>(1, std::vector<double>(num_prediction_samples)));
   }
+}
 
-  // For all samples get tree predictions
-  for (size_t sample_idx = 0; sample_idx < num_prediction_samples; ++sample_idx) {
-
-    if (predict_all || prediction_type == TERMINALNODES) {
-      // Get all tree predictions
-      for (size_t tree_idx = 0; tree_idx < num_trees; ++tree_idx) {
-        if (prediction_type == TERMINALNODES) {
-          predictions[0][sample_idx][tree_idx] = ((TreeRegression*) trees[tree_idx])->getPredictionTerminalNodeID(
-              sample_idx);
-        } else {
-          predictions[0][sample_idx][tree_idx] = ((TreeRegression*) trees[tree_idx])->getPrediction(sample_idx);
-        }
+void ForestRegression::predictInternal(size_t sample_idx) {
+  if (predict_all || prediction_type == TERMINALNODES) {
+    // Get all tree predictions
+    for (size_t tree_idx = 0; tree_idx < num_trees; ++tree_idx) {
+      if (prediction_type == TERMINALNODES) {
+        predictions[0][sample_idx][tree_idx] = ((TreeRegression*) trees[tree_idx])->getPredictionTerminalNodeID(
+            sample_idx);
+      } else {
+        predictions[0][sample_idx][tree_idx] = ((TreeRegression*) trees[tree_idx])->getPrediction(sample_idx);
       }
-    } else {
-      // Mean over trees
-      double prediction_sum = 0;
-      for (size_t tree_idx = 0; tree_idx < num_trees; ++tree_idx) {
-        prediction_sum += ((TreeRegression*) trees[tree_idx])->getPrediction(sample_idx);
-      }
-      predictions[0][0][sample_idx] = prediction_sum / num_trees;
     }
+  } else {
+    // Mean over trees
+    double prediction_sum = 0;
+    for (size_t tree_idx = 0; tree_idx < num_trees; ++tree_idx) {
+      prediction_sum += ((TreeRegression*) trees[tree_idx])->getPrediction(sample_idx);
+    }
+    predictions[0][0][sample_idx] = prediction_sum / num_trees;
   }
 }
 
@@ -125,7 +123,8 @@ void ForestRegression::computePredictionErrorInternal() {
 
 // For each sample sum over trees where sample is OOB
   std::vector<size_t> samples_oob_count;
-  predictions = std::vector<std::vector<std::vector<double>>>(1, std::vector<std::vector<double>>(1, std::vector<double>(num_samples, 0)));
+  predictions = std::vector<std::vector<std::vector<double>>>(1,
+      std::vector<std::vector<double>>(1, std::vector<double>(num_samples, 0)));
   samples_oob_count.resize(num_samples, 0);
   for (size_t tree_idx = 0; tree_idx < num_trees; ++tree_idx) {
     for (size_t sample_idx = 0; sample_idx < trees[tree_idx]->getNumSamplesOob(); ++sample_idx) {
@@ -254,7 +253,7 @@ void ForestRegression::loadFromFileInternal(std::ifstream& infile) {
     }
 
     // Create tree
-    Tree* tree = new TreeRegression(child_nodeIDs, split_varIDs, split_values, &is_ordered_variable);
+    Tree* tree = new TreeRegression(child_nodeIDs, split_varIDs, split_values);
     trees.push_back(tree);
   }
 }
