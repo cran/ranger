@@ -1,29 +1,12 @@
 /*-------------------------------------------------------------------------------
- This file is part of Ranger.
+ This file is part of ranger.
 
- Ranger is free software: you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or
- (at your option) any later version.
+ Copyright (c) [2014-2018] [Marvin N. Wright]
 
- Ranger is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- GNU General Public License for more details.
+ This software may be modified and distributed under the terms of the MIT license.
 
- You should have received a copy of the GNU General Public License
- along with Ranger. If not, see <http://www.gnu.org/licenses/>.
-
- Written by:
-
- Marvin N. Wright
- Institut für Medizinische Biometrie und Statistik
- Universität zu Lübeck
- Ratzeburger Allee 160
- 23562 Lübeck
- Germany
-
- http://www.imbs-luebeck.de
+ Please note that the C++ core of ranger is distributed under MIT license and the
+ R package "ranger" under GPL3 license.
  #-------------------------------------------------------------------------------*/
 
 #include <algorithm>
@@ -35,11 +18,7 @@
 #include "TreeRegression.h"
 #include "Data.h"
 
-ForestRegression::ForestRegression() {
-}
-
-ForestRegression::~ForestRegression() {
-}
+namespace ranger {
 
 void ForestRegression::loadForest(size_t dependent_varID, size_t num_trees,
     std::vector<std::vector<std::vector<size_t>> >& forest_child_nodeIDs,
@@ -53,8 +32,8 @@ void ForestRegression::loadForest(size_t dependent_varID, size_t num_trees,
   // Create trees
   trees.reserve(num_trees);
   for (size_t i = 0; i < num_trees; ++i) {
-    Tree* tree = new TreeRegression(forest_child_nodeIDs[i], forest_split_varIDs[i], forest_split_values[i]);
-    trees.push_back(tree);
+    trees.push_back(
+        make_unique<TreeRegression>(forest_child_nodeIDs[i], forest_split_varIDs[i], forest_split_values[i]));
   }
 
   // Create thread ranges
@@ -83,7 +62,7 @@ void ForestRegression::initInternal(std::string status_variable_name) {
 void ForestRegression::growInternal() {
   trees.reserve(num_trees);
   for (size_t i = 0; i < num_trees; ++i) {
-    trees.push_back(new TreeRegression());
+    trees.push_back(make_unique<TreeRegression>());
   }
 }
 
@@ -103,17 +82,16 @@ void ForestRegression::predictInternal(size_t sample_idx) {
     // Get all tree predictions
     for (size_t tree_idx = 0; tree_idx < num_trees; ++tree_idx) {
       if (prediction_type == TERMINALNODES) {
-        predictions[0][sample_idx][tree_idx] = ((TreeRegression*) trees[tree_idx])->getPredictionTerminalNodeID(
-            sample_idx);
+        predictions[0][sample_idx][tree_idx] = getTreePredictionTerminalNodeID(tree_idx, sample_idx);
       } else {
-        predictions[0][sample_idx][tree_idx] = ((TreeRegression*) trees[tree_idx])->getPrediction(sample_idx);
+        predictions[0][sample_idx][tree_idx] = getTreePrediction(tree_idx, sample_idx);
       }
     }
   } else {
     // Mean over trees
     double prediction_sum = 0;
     for (size_t tree_idx = 0; tree_idx < num_trees; ++tree_idx) {
-      prediction_sum += ((TreeRegression*) trees[tree_idx])->getPrediction(sample_idx);
+      prediction_sum += getTreePrediction(tree_idx, sample_idx);
     }
     predictions[0][0][sample_idx] = prediction_sum / num_trees;
   }
@@ -129,7 +107,7 @@ void ForestRegression::computePredictionErrorInternal() {
   for (size_t tree_idx = 0; tree_idx < num_trees; ++tree_idx) {
     for (size_t sample_idx = 0; sample_idx < trees[tree_idx]->getNumSamplesOob(); ++sample_idx) {
       size_t sampleID = trees[tree_idx]->getOobSampleIDs()[sample_idx];
-      double value = ((TreeRegression*) trees[tree_idx])->getPrediction(sample_idx);
+      double value = getTreePrediction(tree_idx, sample_idx);
 
       predictions[0][0][sampleID] += value;
       ++samples_oob_count[sampleID];
@@ -155,7 +133,9 @@ void ForestRegression::computePredictionErrorInternal() {
 
 // #nocov start
 void ForestRegression::writeOutputInternal() {
-  *verbose_out << "Tree type:                         " << "Regression" << std::endl;
+  if (verbose_out) {
+    *verbose_out << "Tree type:                         " << "Regression" << std::endl;
+  }
 }
 
 void ForestRegression::writeConfusionFile() {
@@ -172,7 +152,8 @@ void ForestRegression::writeConfusionFile() {
   outfile << "Overall OOB prediction error (MSE): " << overall_prediction_error << std::endl;
 
   outfile.close();
-  *verbose_out << "Saved prediction error to file " << filename << "." << std::endl;
+  if (verbose_out)
+    *verbose_out << "Saved prediction error to file " << filename << "." << std::endl;
 }
 
 void ForestRegression::writePredictionFile() {
@@ -207,7 +188,8 @@ void ForestRegression::writePredictionFile() {
     }
   }
 
-  *verbose_out << "Saved predictions to file " << filename << "." << std::endl;
+  if (verbose_out)
+    *verbose_out << "Saved predictions to file " << filename << "." << std::endl;
 }
 
 void ForestRegression::saveToFileInternal(std::ofstream& outfile) {
@@ -253,8 +235,20 @@ void ForestRegression::loadFromFileInternal(std::ifstream& infile) {
     }
 
     // Create tree
-    Tree* tree = new TreeRegression(child_nodeIDs, split_varIDs, split_values);
-    trees.push_back(tree);
+    trees.push_back(make_unique<TreeRegression>(child_nodeIDs, split_varIDs, split_values));
   }
 }
+
+double ForestRegression::getTreePrediction(size_t tree_idx, size_t sample_idx) const {
+  const auto& tree = dynamic_cast<const TreeRegression&>(*trees[tree_idx]);
+  return tree.getPrediction(sample_idx);
+}
+
+size_t ForestRegression::getTreePredictionTerminalNodeID(size_t tree_idx, size_t sample_idx) const {
+  const auto& tree = dynamic_cast<const TreeRegression&>(*trees[tree_idx]);
+  return tree.getPredictionTerminalNodeID(sample_idx);
+}
+
 // #nocov end
+
+}// namespace ranger

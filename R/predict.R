@@ -118,7 +118,7 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   } else if (type == "quantiles") {
     stop("Error: Apply predict() to the ranger object instead of the $forest object to predict quantiles.")
   } else {
-    stop("Error: Invalid value for 'type'. Use 'response' or 'terminalNodes'.")
+    stop("Error: Invalid value for 'type'. Use 'response', 'se', 'terminalNodes', or 'quantiles'.")
   }
   
   ## Type "se" only for certain tree types
@@ -289,10 +289,12 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   minprop <- 0
   case.weights <- c(0, 0)
   use.case.weights <- FALSE
+  class.weights <- c(0, 0)
   keep.inbag <- FALSE
   sample.fraction <- 1
   holdout <- FALSE
   num.random.splits <- 1
+  order.snps <- FALSE
   
   ## Use sparse matrix
   if ("dgCMatrix" %in% class(data.final)) {
@@ -311,8 +313,10 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
                       always.split.variables, use.always.split.variables,
                       status.variable.name, prediction.mode, forest, snp.data, replace, probability,
                       unordered.factor.variables, use.unordered.factor.variables, save.memory, splitrule,
-                      case.weights, use.case.weights, predict.all, keep.inbag, sample.fraction,
-                      alpha, minprop, holdout, prediction.type, num.random.splits, sparse.data, use.sparse.data)
+                      case.weights, use.case.weights, class.weights, 
+                      predict.all, keep.inbag, sample.fraction, alpha, minprop, holdout, 
+                      prediction.type, num.random.splits, sparse.data, use.sparse.data,
+                      order.snps)
 
   if (length(result) == 0) {
     stop("User interrupt or internal error.")
@@ -361,7 +365,8 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
         }
         
         ## Set colnames and sort by levels
-        colnames(result$predictions) <- forest$levels[forest$class.values]
+        leveldiff <- max(forest$class.values) - length(forest$levels)
+        colnames(result$predictions) <- forest$levels[forest$class.values - leveldiff]
         result$predictions <- result$predictions[, forest$levels, drop = FALSE]
       }
     }
@@ -515,7 +520,7 @@ predict.ranger <- function(object, data = NULL, predict.all = FALSE,
       node.values <- object$random.node.values.oob
     } else {
       ## New data prediction
-      terminal.nodes <- predict(object, data, type = "terminalNodes")$predictions
+      terminal.nodes <- predict(object, data, type = "terminalNodes")$predictions + 1
       node.values <- 0 * terminal.nodes
       for (tree in 1:num.trees) {
         node.values[, tree] <- object$random.node.values[terminal.nodes[, tree], tree]

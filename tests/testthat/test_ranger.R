@@ -2,19 +2,6 @@ library(ranger)
 library(survival)
 context("ranger")
 
-## GenABEL
-if (!requireNamespace("GenABEL", quietly = TRUE)) {
-  stop("Package GenABEL is required for testing ranger completely. Please install it.", call. = FALSE)
-} else {
-  dat.gwaa <- readRDS("../test_gwaa.Rds")
-  rg.gwaa <- ranger(CHD ~ ., data = dat.gwaa, verbose = FALSE, write.forest = TRUE)
-}
-
-test_that("classification gwaa rf is of class ranger with 15 elements", {
-  expect_is(rg.gwaa, "ranger")
-  expect_equal(length(rg.gwaa), 15)
-})
-
 test_that("Matrix interface works for Probability estimation", {
   rf <- ranger(dependent.variable.name = "Species", data = data.matrix(iris), write.forest = TRUE, probability = TRUE)
   expect_equal(rf$treetype, "Probability estimation")
@@ -36,6 +23,78 @@ test_that("no warning if data.frame has two classes", {
 test_that("Error if sample fraction is 0 or >1", {
   expect_error(ranger(Species ~ ., iris, num.trees = 5, sample.fraction = 0))
   expect_error(ranger(Species ~ ., iris, num.trees = 5, sample.fraction = 1.1))
+})
+
+test_that("Error if sample fraction is vector for regression", {
+  expect_error(ranger(Sepal.Length ~ ., iris, num.trees = 5, sample.fraction = c(0.1, 0.2)), 
+               "Error: Invalid value for sample\\.fraction\\. Vector values only valid for classification forests\\.")
+})
+
+test_that("Error if sample fraction is vector of wrong size", {
+  expect_error(ranger(Species ~ ., iris, num.trees = 5, sample.fraction = c(0.1, 0.2)), 
+               "Error: Invalid value for sample\\.fraction\\. Expecting 3 values, provided 2\\.")
+})
+
+test_that("Error if element of sample fraction vector is <0 or >1", {
+  expect_error(ranger(Species ~ ., iris, num.trees = 5, sample.fraction = c(0.1, 1.1, 0.3)), 
+               "Error: Invalid value for sample\\.fraction. Please give a value in \\(0,1\\] or a vector of values in \\[0,1\\]\\.")
+  expect_error(ranger(Species ~ ., iris, num.trees = 5, sample.fraction = c(-3, 0.5, 0.3)), 
+               "Error: Invalid value for sample.fraction. Please give a value in \\(0,1] or a vector of values in \\[0,1\\]\\.")
+})
+
+test_that("Error if sum of sample fraction vector is 0", {
+  expect_error(ranger(Species ~ ., iris, num.trees = 5, sample.fraction = c(0, 0, 0)), 
+               "Error: Invalid value for sample\\.fraction. Sum of values must be >0\\.")
+})
+
+test_that("Error if replace=FALSE and not enough samples", {
+  expect_error(ranger(Species ~ ., iris, num.trees = 5, sample.fraction = c(0.2, 0.3, 0.4), 
+                      replace = FALSE, keep.inbag = TRUE), 
+               "Error: Not enough samples in class virginica; available: 50, requested: 60.")
+  expect_silent(ranger(Species ~ ., iris, num.trees = 5, sample.fraction = c(0.2, 0.3, 0.4), 
+                       replace = TRUE, keep.inbag = TRUE))
+})
+
+test_that("Error if sample.fraction and case.weights", {
+  expect_error(ranger(Species ~ ., iris, num.trees = 5, sample.fraction = c(0.2, 0.3, 0.4), 
+                      case.weights = rbinom(nrow(iris), 1, 0.5)), 
+               "Error: Combination of case\\.weights and class-wise sampling not supported\\.")
+})
+
+test_that("Inbag counts match sample fraction, classification", {
+  ## With replacement
+  rf <- ranger(Species ~ ., iris, num.trees = 5, sample.fraction = c(0.2, 0.3, 0.4), 
+               replace = TRUE, keep.inbag = TRUE)
+  inbag <- do.call(cbind, rf$inbag.counts)
+  expect_equal(unique(colSums(inbag[1:50, ])), 30)
+  expect_equal(unique(colSums(inbag[51:100, ])), 45)
+  expect_equal(unique(colSums(inbag[101:150, ])), 60)
+  
+  ## Without replacement
+  rf <- ranger(Species ~ ., iris, num.trees = 5, sample.fraction = c(0.1, 0.2, 0.3), 
+               replace = FALSE, keep.inbag = TRUE)
+  inbag <- do.call(cbind, rf$inbag.counts)
+  expect_equal(unique(colSums(inbag[1:50, ])), 15)
+  expect_equal(unique(colSums(inbag[51:100, ])), 30)
+  expect_equal(unique(colSums(inbag[101:150, ])), 45)
+})
+
+test_that("Inbag counts match sample fraction, probability", {
+  ## With replacement
+  rf <- ranger(Species ~ ., iris, num.trees = 5, sample.fraction = c(0.2, 0.3, 0.4), 
+               replace = TRUE, keep.inbag = TRUE, probability = TRUE)
+  inbag <- do.call(cbind, rf$inbag.counts)
+  expect_equal(unique(colSums(inbag[1:50, ])), 30)
+  expect_equal(unique(colSums(inbag[51:100, ])), 45)
+  expect_equal(unique(colSums(inbag[101:150, ])), 60)
+  
+  ## Without replacement
+  rf <- ranger(Species ~ ., iris, num.trees = 5, sample.fraction = c(0.1, 0.2, 0.3), 
+               replace = FALSE, keep.inbag = TRUE, probability = TRUE)
+  inbag <- do.call(cbind, rf$inbag.counts)
+  expect_equal(unique(colSums(inbag[1:50, ])), 15)
+  expect_equal(unique(colSums(inbag[51:100, ])), 30)
+  expect_equal(unique(colSums(inbag[101:150, ])), 45)
 })
 
 test_that("as.factor() in formula works", {
@@ -207,9 +266,4 @@ test_that("No error if variable named forest", {
   expect_silent(predict(rf, dat))
 })
 
-test_that("GenABEL prediction works if no covariates and formula used", {
-  dat <- dat.gwaa
-  dat@phdata$Age <- NULL
-  rf <- ranger(CHD ~ .-Sex, data = dat, num.trees = 5)
-  expect_silent(predict(rf, dat))
-})
+

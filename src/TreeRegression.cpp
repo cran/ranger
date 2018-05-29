@@ -1,35 +1,17 @@
 /*-------------------------------------------------------------------------------
- This file is part of Ranger.
+ This file is part of ranger.
 
- Ranger is free software: you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or
- (at your option) any later version.
+ Copyright (c) [2014-2018] [Marvin N. Wright]
 
- Ranger is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- GNU General Public License for more details.
+ This software may be modified and distributed under the terms of the MIT license.
 
- You should have received a copy of the GNU General Public License
- along with Ranger. If not, see <http://www.gnu.org/licenses/>.
-
- Written by:
-
- Marvin N. Wright
- Institut für Medizinische Biometrie und Statistik
- Universität zu Lübeck
- Ratzeburger Allee 160
- 23562 Lübeck
- Germany
-
- http://www.imbs-luebeck.de
+ Please note that the C++ core of ranger is distributed under MIT license and the
+ R package "ranger" under GPL3 license.
  #-------------------------------------------------------------------------------*/
 
 #include <algorithm>
 #include <iostream>
 #include <iterator>
-#include <vector>
 
 #include <ctime>
 
@@ -37,17 +19,11 @@
 #include "TreeRegression.h"
 #include "Data.h"
 
-TreeRegression::TreeRegression() :
-    counter(0), sums(0) {
-}
+namespace ranger {
 
 TreeRegression::TreeRegression(std::vector<std::vector<size_t>>& child_nodeIDs, std::vector<size_t>& split_varIDs,
     std::vector<double>& split_values) :
     Tree(child_nodeIDs, split_varIDs, split_values), counter(0), sums(0) {
-}
-
-TreeRegression::~TreeRegression() {
-  // Empty on purpose
 }
 
 void TreeRegression::allocateMemory() {
@@ -60,8 +36,8 @@ void TreeRegression::allocateMemory() {
       max_num_splits = num_random_splits;
     }
 
-    counter = new size_t[max_num_splits];
-    sums = new double[max_num_splits];
+    counter.resize(max_num_splits);
+    sums.resize(max_num_splits);
   }
 }
 
@@ -205,20 +181,26 @@ void TreeRegression::findBestSplitValueSmallQ(size_t nodeID, size_t varID, doubl
     return;
   }
 
-  // Initialize with 0 if not in memory efficient mode, use pre-allocated space
   // -1 because no split possible at largest value
-  size_t num_splits = possible_split_values.size() - 1;
-  double* sums_right;
-  size_t* n_right;
+  const size_t num_splits = possible_split_values.size() - 1;
   if (memory_saving_splitting) {
-    sums_right = new double[num_splits]();
-    n_right = new size_t[num_splits]();
+    std::vector<double> sums_right(num_splits);
+    std::vector<size_t> n_right(num_splits);
+    findBestSplitValueSmallQ(nodeID, varID, sum_node, num_samples_node, best_value, best_varID, best_decrease,
+        possible_split_values, sums_right, n_right);
   } else {
-    sums_right = sums;
-    n_right = counter;
-    std::fill(sums_right, sums_right + num_splits, 0);
-    std::fill(n_right, n_right + num_splits, 0);
+    std::fill_n(sums.begin(), num_splits, 0);
+    std::fill_n(counter.begin(), num_splits, 0);
+    findBestSplitValueSmallQ(nodeID, varID, sum_node, num_samples_node, best_value, best_varID, best_decrease,
+        possible_split_values, sums, counter);
   }
+}
+
+void TreeRegression::findBestSplitValueSmallQ(size_t nodeID, size_t varID, double sum_node, size_t num_samples_node,
+    double& best_value, size_t& best_varID, double& best_decrease, std::vector<double> possible_split_values,
+    std::vector<double>& sums_right, std::vector<size_t>& n_right) {
+  // -1 because no split possible at largest value
+  const size_t num_splits = possible_split_values.size() - 1;
 
   // Sum in right child and possbile split
   for (auto& sampleID : sampleIDs[nodeID]) {
@@ -261,11 +243,6 @@ void TreeRegression::findBestSplitValueSmallQ(size_t nodeID, size_t varID, doubl
       }
     }
   }
-
-  if (memory_saving_splitting) {
-    delete[] sums_right;
-    delete[] n_right;
-  }
 }
 
 void TreeRegression::findBestSplitValueLargeQ(size_t nodeID, size_t varID, double sum_node, size_t num_samples_node,
@@ -273,8 +250,8 @@ void TreeRegression::findBestSplitValueLargeQ(size_t nodeID, size_t varID, doubl
 
   // Set counters to 0
   size_t num_unique = data->getNumUniqueDataValues(varID);
-  std::fill(counter, counter + num_unique, 0);
-  std::fill(sums, sums + num_unique, 0);
+  std::fill_n(counter.begin(), num_unique, 0);
+  std::fill_n(sums.begin(), num_unique, 0);
 
   for (auto& sampleID : sampleIDs[nodeID]) {
     size_t index = data->getIndex(sampleID, varID);
@@ -408,6 +385,8 @@ bool TreeRegression::findBestSplitMaxstat(size_t nodeID, std::vector<size_t>& po
   values.reserve(possible_split_varIDs.size());
   std::vector<double> candidate_varIDs;
   candidate_varIDs.reserve(possible_split_varIDs.size());
+  std::vector<double> test_statistics;
+  test_statistics.reserve(possible_split_varIDs.size());
 
   // Compute p-values
   for (auto& varID : possible_split_varIDs) {
@@ -445,12 +424,14 @@ bool TreeRegression::findBestSplitMaxstat(size_t nodeID, std::vector<size_t>& po
       pvalues.push_back(pvalue);
       values.push_back(best_split_value);
       candidate_varIDs.push_back(varID);
+      test_statistics.push_back(best_maxstat);
     }
   }
 
   double adjusted_best_pvalue = std::numeric_limits<double>::max();
   size_t best_varID = 0;
   double best_value = 0;
+  double best_maxstat = 0;
 
   if (pvalues.size() > 0) {
     // Adjust p-values with Benjamini/Hochberg
@@ -464,6 +445,7 @@ bool TreeRegression::findBestSplitMaxstat(size_t nodeID, std::vector<size_t>& po
         best_varID = candidate_varIDs[i];
         best_value = values[i];
         adjusted_best_pvalue = adjusted_pvalues[i];
+        best_maxstat = test_statistics[i];
       }
     }
   }
@@ -475,6 +457,12 @@ bool TreeRegression::findBestSplitMaxstat(size_t nodeID, std::vector<size_t>& po
     // If not terminal node save best values
     split_varIDs[nodeID] = best_varID;
     split_values[nodeID] = best_value;
+
+    // Compute decrease of impurity for this node and add to variable importance if needed
+    if (importance_mode == IMP_GINI || importance_mode == IMP_GINI_CORRECTED) {
+      addImpurityImportance(nodeID, best_varID, best_maxstat);
+    }
+
     return false;
   }
 }
@@ -541,19 +529,24 @@ void TreeRegression::findBestSplitValueExtraTrees(size_t nodeID, size_t varID, d
     possible_split_values.push_back(udist(random_number_generator));
   }
 
-  // Initialize with 0m if not in memory efficient mode, use pre-allocated space
-  size_t num_splits = possible_split_values.size();
-  double* sums_right;
-  size_t* n_right;
+  const size_t num_splits = possible_split_values.size();
   if (memory_saving_splitting) {
-    sums_right = new double[num_splits]();
-    n_right = new size_t[num_splits]();
+    std::vector<double> sums_right(num_splits);
+    std::vector<size_t> n_right(num_splits);
+    findBestSplitValueExtraTrees(nodeID, varID, sum_node, num_samples_node, best_value, best_varID, best_decrease,
+        possible_split_values, sums_right, n_right);
   } else {
-    sums_right = sums;
-    n_right = counter;
-    std::fill(sums_right, sums_right + num_splits, 0);
-    std::fill(n_right, n_right + num_splits, 0);
+    std::fill_n(sums.begin(), num_splits, 0);
+    std::fill_n(counter.begin(), num_splits, 0);
+    findBestSplitValueExtraTrees(nodeID, varID, sum_node, num_samples_node, best_value, best_varID, best_decrease,
+        possible_split_values, sums, counter);
   }
+}
+
+void TreeRegression::findBestSplitValueExtraTrees(size_t nodeID, size_t varID, double sum_node, size_t num_samples_node,
+    double& best_value, size_t& best_varID, double& best_decrease, std::vector<double> possible_split_values,
+    std::vector<double>& sums_right, std::vector<size_t>& n_right) {
+  const size_t num_splits = possible_split_values.size();
 
   // Sum in right child and possbile split
   for (auto& sampleID : sampleIDs[nodeID]) {
@@ -590,11 +583,6 @@ void TreeRegression::findBestSplitValueExtraTrees(size_t nodeID, size_t varID, d
       best_varID = varID;
       best_decrease = decrease;
     }
-  }
-
-  if (memory_saving_splitting) {
-    delete[] sums_right;
-    delete[] n_right;
   }
 }
 
@@ -690,11 +678,14 @@ void TreeRegression::findBestSplitValueExtraTreesUnordered(size_t nodeID, size_t
 
 void TreeRegression::addImpurityImportance(size_t nodeID, size_t varID, double decrease) {
 
-  double sum_node = 0;
-  for (auto& sampleID : sampleIDs[nodeID]) {
-    sum_node += data->get(sampleID, dependent_varID);
+  double best_decrease = decrease;
+  if (splitrule != MAXSTAT) {
+    double sum_node = 0;
+    for (auto& sampleID : sampleIDs[nodeID]) {
+      sum_node += data->get(sampleID, dependent_varID);
+    }
+    best_decrease = decrease - sum_node * sum_node / (double) sampleIDs[nodeID].size();
   }
-  double best_decrease = decrease - sum_node * sum_node / (double) sampleIDs[nodeID].size();
 
   // No variable importance for no split variables
   size_t tempvarID = data->getUnpermutedVarID(varID);
@@ -712,3 +703,4 @@ void TreeRegression::addImpurityImportance(size_t nodeID, size_t varID, double d
   }
 }
 
+} // namespace ranger

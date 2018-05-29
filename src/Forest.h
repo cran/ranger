@@ -1,29 +1,12 @@
 /*-------------------------------------------------------------------------------
- This file is part of Ranger.
+ This file is part of ranger.
 
- Ranger is free software: you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or
- (at your option) any later version.
+ Copyright (c) [2014-2018] [Marvin N. Wright]
 
- Ranger is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- GNU General Public License for more details.
+ This software may be modified and distributed under the terms of the MIT license.
 
- You should have received a copy of the GNU General Public License
- along with Ranger. If not, see <http://www.gnu.org/licenses/>.
-
- Written by:
-
- Marvin N. Wright
- Institut für Medizinische Biometrie und Statistik
- Universität zu Lübeck
- Ratzeburger Allee 160
- 23562 Lübeck
- Germany
-
- http://www.imbs-luebeck.de
+ Please note that the C++ core of ranger is distributed under MIT license and the
+ R package "ranger" under GPL3 license.
  #-------------------------------------------------------------------------------*/
 
 #ifndef FOREST_H_
@@ -33,6 +16,7 @@
 #include <iostream>
 #include <random>
 #include <ctime>
+#include <memory>
 #ifndef OLD_WIN_R_BUILD
 #include <thread>
 #include <chrono>
@@ -44,33 +28,40 @@
 #include "Tree.h"
 #include "Data.h"
 
+namespace ranger {
+
 class Forest {
 public:
   Forest();
-  virtual ~Forest();
+
+  Forest(const Forest&) = delete;
+  Forest& operator=(const Forest&) = delete;
+
+  virtual ~Forest() = default;
 
   // Init from c++ main or Rcpp from R
   void initCpp(std::string dependent_variable_name, MemoryMode memory_mode, std::string input_file, uint mtry,
       std::string output_prefix, uint num_trees, std::ostream* verbose_out, uint seed, uint num_threads,
       std::string load_forest_filename, ImportanceMode importance_mode, uint min_node_size,
-      std::string split_select_weights_file, std::vector<std::string>& always_split_variable_names,
+      std::string split_select_weights_file, const std::vector<std::string>& always_split_variable_names,
       std::string status_variable_name, bool sample_with_replacement,
-      std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
+      const std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
       std::string case_weights_file, bool predict_all, double sample_fraction, double alpha, double minprop,
       bool holdout, PredictionType prediction_type, uint num_random_splits);
-  void initR(std::string dependent_variable_name, Data* input_data, uint mtry, uint num_trees,
+  void initR(std::string dependent_variable_name, std::unique_ptr<Data> input_data, uint mtry, uint num_trees,
       std::ostream* verbose_out, uint seed, uint num_threads, ImportanceMode importance_mode, uint min_node_size,
-      std::vector<std::vector<double>>& split_select_weights, std::vector<std::string>& always_split_variable_names,
-      std::string status_variable_name, bool prediction_mode, bool sample_with_replacement,
-      std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
-      std::vector<double>& case_weights, bool predict_all, bool keep_inbag, double sample_fraction, double alpha,
-      double minprop, bool holdout, PredictionType prediction_type, uint num_random_splits);
-  void init(std::string dependent_variable_name, MemoryMode memory_mode, Data* input_data, uint mtry,
+      std::vector<std::vector<double>>& split_select_weights,
+      const std::vector<std::string>& always_split_variable_names, std::string status_variable_name,
+      bool prediction_mode, bool sample_with_replacement, const std::vector<std::string>& unordered_variable_names,
+      bool memory_saving_splitting, SplitRule splitrule, std::vector<double>& case_weights, bool predict_all,
+      bool keep_inbag, std::vector<double>& sample_fraction, double alpha, double minprop, bool holdout,
+      PredictionType prediction_type, uint num_random_splits, bool order_snps);
+  void init(std::string dependent_variable_name, MemoryMode memory_mode, std::unique_ptr<Data> input_data, uint mtry,
       std::string output_prefix, uint num_trees, uint seed, uint num_threads, ImportanceMode importance_mode,
       uint min_node_size, std::string status_variable_name, bool prediction_mode, bool sample_with_replacement,
-      std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
-      bool predict_all, double sample_fraction, double alpha, double minprop, bool holdout,
-      PredictionType prediction_type, uint num_random_splits);
+      const std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
+      bool predict_all, std::vector<double>& sample_fraction, double alpha, double minprop, bool holdout,
+      PredictionType prediction_type, uint num_random_splits, bool order_snps);
   virtual void initInternal(std::string status_variable_name) = 0;
 
   // Grow or predict
@@ -87,7 +78,7 @@ public:
   void saveToFile();
   virtual void saveToFileInternal(std::ofstream& outfile) = 0;
 
-  std::vector<std::vector<std::vector<size_t>>>getChildNodeIDs() {
+  std::vector<std::vector<std::vector<size_t>>> getChildNodeIDs() {
     std::vector<std::vector<std::vector<size_t>>> result;
     for (auto& tree : trees) {
       result.push_back(tree->getChildNodeIDs());
@@ -114,7 +105,7 @@ public:
   double getOverallPredictionError() const {
     return overall_prediction_error;
   }
-  const std::vector<std::vector<std::vector<double>> >& getPredictions() const {
+  const std::vector<std::vector<std::vector<double>>>& getPredictions() const {
     return predictions;
   }
   size_t getDependentVarId() const {
@@ -145,6 +136,10 @@ public:
     return result;
   }
 
+  const std::vector<std::vector<size_t>>& getSnpOrder() const {
+    return data->getSnpOrder();
+  }
+
 protected:
   void grow();
   virtual void growInternal() = 0;
@@ -163,7 +158,8 @@ protected:
   void growTreesInThread(uint thread_idx, std::vector<double>* variable_importance);
   void predictTreesInThread(uint thread_idx, const Data* prediction_data, bool oob_prediction);
   void predictInternalInThread(uint thread_idx);
-  void computeTreePermutationImportanceInThread(uint thread_idx, std::vector<double>* importance, std::vector<double>* variance);
+  void computeTreePermutationImportanceInThread(uint thread_idx, std::vector<double>& importance,
+      std::vector<double>& variance);
 
   // Load forest from file
   void loadFromFile(std::string filename);
@@ -171,13 +167,13 @@ protected:
 
   // Set split select weights and variables to be always considered for splitting
   void setSplitWeightVector(std::vector<std::vector<double>>& split_select_weights);
-  void setAlwaysSplitVariables(std::vector<std::string>& always_split_variable_names);
+  void setAlwaysSplitVariables(const std::vector<std::string>& always_split_variable_names);
 
   // Show progress every few seconds
 #ifdef OLD_WIN_R_BUILD
   void showProgress(std::string operation, clock_t start_time, clock_t& lap_time);
 #else
-  void showProgress(std::string operation);
+  void showProgress(std::string operation, size_t max_progress);
 #endif
 
   // Verbose output stream, cout if verbose==true, logfile if not
@@ -198,7 +194,7 @@ protected:
   SplitRule splitrule;
   bool predict_all;
   bool keep_inbag;
-  double sample_fraction;
+  std::vector<double> sample_fraction;
   bool holdout;
   PredictionType prediction_type;
   uint num_random_splits;
@@ -215,8 +211,8 @@ protected:
   std::condition_variable condition_variable;
 #endif
 
-  std::vector<Tree*> trees;
-  Data* data;
+  std::vector<std::unique_ptr<Tree>> trees;
+  std::unique_ptr<Data> data;
 
   std::vector<std::vector<std::vector<double>>> predictions;
   double overall_prediction_error;
@@ -245,9 +241,8 @@ protected:
   size_t aborted_threads;
   bool aborted;
 #endif
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(Forest);
 };
+
+} // namespace ranger
 
 #endif /* FOREST_H_ */
