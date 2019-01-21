@@ -89,6 +89,7 @@
 ##' @param write.forest Save \code{ranger.forest} object, required for prediction. Set to \code{FALSE} to reduce memory usage if no prediction intended.
 ##' @param probability Grow a probability forest as in Malley et al. (2012). 
 ##' @param min.node.size Minimal node size. Default 1 for classification, 5 for regression, 3 for survival, and 10 for probability.
+##' @param max.depth Maximal tree depth. A value of NULL or 0 (the default) corresponds to unlimited depth, 1 to tree stumps (1 split per tree).
 ##' @param replace Sample with replacement. 
 ##' @param sample.fraction Fraction of observations to sample. Default is 1 for sampling with replacement and 0.632 for sampling without replacement. For classification, this can be a vector of class-specific values. 
 ##' @param case.weights Weights for sampling of training observations. Observations with larger weights will be selected with higher probability in the bootstrap (or subsampled) samples for the trees.
@@ -102,8 +103,10 @@
 ##' @param respect.unordered.factors Handling of unordered factor covariates. One of 'ignore', 'order' and 'partition'. For the "extratrees" splitrule the default is "partition" for all other splitrules 'ignore'. Alternatively TRUE (='order') or FALSE (='ignore') can be used. See below for details. 
 ##' @param scale.permutation.importance Scale permutation importance by standard error as in (Breiman 2001). Only applicable if permutation variable importance mode selected.
 ##' @param keep.inbag Save how often observations are in-bag in each tree. 
+##' @param inbag Manually set observations per tree. List of size num.trees, containing inbag counts for each observation. Can be used for stratified sampling.
 ##' @param holdout Hold-out mode. Hold-out all samples with case weight 0 and use these for variable importance and prediction error.
 ##' @param quantreg Prepare quantile prediction as in quantile regression forests (Meinshausen 2006). Regression only. Set \code{keep.inbag = TRUE} to prepare out-of-bag quantile prediction.
+##' @param oob.error Compute OOB prediction error. Set to \code{FALSE} to save computation time, e.g. for large survival forests.
 ##' @param num.threads Number of threads. Default is number of CPUs available.
 ##' @param save.memory Use memory saving (but slower) splitting mode. No effect for survival and GWAS data. Warning: This option slows down the tree growing, use only if you encounter memory problems.
 ##' @param verbose Show computation status and estimated runtime.
@@ -174,18 +177,18 @@
 ##' @author Marvin N. Wright
 ##' @references
 ##' \itemize{
-##'   \item Wright, M. N. & Ziegler, A. (2017). ranger: A fast implementation of random forests for high dimensional data in C++ and R. J Stat Softw 77:1-17. \url{http://dx.doi.org/10.18637/jss.v077.i01}.
-##'   \item Schmid, M., Wright, M. N. & Ziegler, A. (2016). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Syst Appl 63:450-459. \url{http://dx.doi.org/10.1016/j.eswa.2016.07.018}. 
-##'   \item Wright, M. N., Dankowski, T. & Ziegler, A. (2017). Unbiased split variable selection for random survival forests using maximally selected rank statistics. Stat Med 36:1272-1284. \url{http://dx.doi.org/10.1002/sim.7212}.
-##'   \item Nembrini, S., Koenig, I. R. & Wright, M. N. (2018). The revival of the Gini Importance? Bioinformatics. \url{http://dx.doi.org/10.1093/bioinformatics/bty373}.
-##'   \item Breiman, L. (2001). Random forests. Mach Learn, 45:5-32. \url{http://dx.doi.org/10.1023/A:1010933404324}. 
-##'   \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat 2:841-860. \url{http://dx.doi.org/10.1097/JTO.0b013e318233d835}. 
-##'   \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med 51:74-81. \url{http://dx.doi.org/10.3414/ME00-01-0052}.
+##'   \item Wright, M. N. & Ziegler, A. (2017). ranger: A fast implementation of random forests for high dimensional data in C++ and R. J Stat Softw 77:1-17. \url{https://doi.org/10.18637/jss.v077.i01}.
+##'   \item Schmid, M., Wright, M. N. & Ziegler, A. (2016). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Syst Appl 63:450-459. \url{https://doi.org/10.1016/j.eswa.2016.07.018}. 
+##'   \item Wright, M. N., Dankowski, T. & Ziegler, A. (2017). Unbiased split variable selection for random survival forests using maximally selected rank statistics. Stat Med 36:1272-1284. \url{https://doi.org/10.1002/sim.7212}.
+##'   \item Nembrini, S., Koenig, I. R. & Wright, M. N. (2018). The revival of the Gini Importance? Bioinformatics. \url{https://doi.org/10.1093/bioinformatics/bty373}.
+##'   \item Breiman, L. (2001). Random forests. Mach Learn, 45:5-32. \url{https://doi.org/10.1023/A:1010933404324}. 
+##'   \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat 2:841-860. \url{https://doi.org/10.1097/JTO.0b013e318233d835}. 
+##'   \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med 51:74-81. \url{https://doi.org/10.3414/ME00-01-0052}.
 ##'   \item Hastie, T., Tibshirani, R., Friedman, J. (2009). The Elements of Statistical Learning. Springer, New York. 2nd edition.
-##'   \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \url{http://dx.doi.org/10.1007/s10994-006-6226-1}.
+##'   \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \url{https://doi.org/10.1007/s10994-006-6226-1}.
 ##'   \item Meinshausen (2006). Quantile Regression Forests. J Mach Learn Res 7:983-999. \url{http://www.jmlr.org/papers/v7/meinshausen06a.html}.  
-##'   \item Sandri, M. & Zuccolotto, P. (2008). A bias correction algorithm for the Gini variable importance measure in classification trees. J Comput Graph Stat, 17:611-628. \url{http://dx.doi.org/10.1198/106186008X344522}.
-##'   \item Coppersmith D., Hong S. J., Hosking J. R. (1999). Partitioning nominal attributes in decision trees. Data Min Knowl Discov 3:197-217. \url{http://dx.doi.org/10.1023/A:1009869804967}.
+##'   \item Sandri, M. & Zuccolotto, P. (2008). A bias correction algorithm for the Gini variable importance measure in classification trees. J Comput Graph Stat, 17:611-628. \url{https://doi.org/10.1198/106186008X344522}.
+##'   \item Coppersmith D., Hong S. J., Hosking J. R. (1999). Partitioning nominal attributes in decision trees. Data Min Knowl Discov 3:197-217. \url{https://doi.org/10.1023/A:1009869804967}.
 ##'   }
 ##' @seealso \code{\link{predict.ranger}}
 ##' @encoding UTF-8
@@ -197,15 +200,15 @@
 ##' @export
 ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                    importance = "none", write.forest = TRUE, probability = FALSE,
-                   min.node.size = NULL, replace = TRUE, 
+                   min.node.size = NULL, max.depth = NULL, replace = TRUE, 
                    sample.fraction = ifelse(replace, 1, 0.632), 
                    case.weights = NULL, class.weights = NULL, splitrule = NULL, 
                    num.random.splits = 1, alpha = 0.5, minprop = 0.1,
                    split.select.weights = NULL, always.split.variables = NULL,
                    respect.unordered.factors = NULL,
                    scale.permutation.importance = FALSE,
-                   keep.inbag = FALSE, holdout = FALSE,
-                   quantreg = FALSE,
+                   keep.inbag = FALSE, inbag = NULL, holdout = FALSE,
+                   quantreg = FALSE, oob.error = TRUE,
                    num.threads = NULL, save.memory = FALSE,
                    verbose = TRUE, seed = NULL, 
                    dependent.variable.name = NULL, status.variable.name = NULL, 
@@ -243,10 +246,10 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
       stop("Error: Please give formula or dependent variable name.")
     }
     if (is.null(status.variable.name)) {
-      status.variable.name <- "none"
-      response <- data[, dependent.variable.name]
+      status.variable.name <- ""
+      response <- data[, dependent.variable.name, drop = TRUE]
     } else {
-      response <- data[, c(dependent.variable.name, status.variable.name)]
+      response <- survival::Surv(data[, dependent.variable.name], data[, status.variable.name]) #data[, c(dependent.variable.name, status.variable.name)]
     }
     data.selected <- data
   } else {
@@ -254,7 +257,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     if (class(formula) != "formula") {
       stop("Error: Invalid formula.")
     }
-    data.selected <- parse.formula(formula, data)
+    data.selected <- parse.formula(formula, data, env = parent.frame())
     response <- data.selected[, 1]
   }
   
@@ -281,7 +284,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     } else {
       treetype <- 1
     }
-  } else if (is.numeric(response) && is.vector(response)) {
+  } else if (is.numeric(response) && (is.null(ncol(response)) || ncol(response) == 1)) {
     if (!is.null(classification) && classification && !probability) {
       treetype <- 1
     } else if (probability) {
@@ -307,7 +310,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
       status.variable.name <- dimnames(response)[[2]][2]
     } else {
       dependent.variable.name <- names(data.selected)[1]
-      status.variable.name <- "none"
+      status.variable.name <- ""
     }
     independent.variable.names <- names(data.selected)[-1]
   } else {
@@ -346,7 +349,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
       recode.idx <- independent.idx & (character.idx | (factor.idx & !ordered.idx))
 
       if (any(recode.idx) & (importance == "impurity_corrected" || importance == "impurity_unbiased")) {
-        stop("Corrected impurity importance not supported in combination with ordering unordered factors, consider 'ignore' or 'partition'.")
+        warning("Corrected impurity importance may not be unbiased for re-ordered factor levels. Consider setting respect.unordered.factors to 'ignore' or 'partition' or manually compute corrected importance.")
       }
       
       ## Numeric response
@@ -380,7 +383,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
         }
         
         ## Return reordered factor
-        factor(x, levels = levels.ordered, ordered = TRUE)
+        factor(x, levels = levels.ordered, ordered = TRUE, exclude = NULL)
       })
       
       ## Save levels
@@ -454,6 +457,13 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     stop("Error: Invalid value for min.node.size")
   }
   
+  ## Tree depth
+  if (is.null(max.depth)) {
+    max.depth <- 0
+  } else if (!is.numeric(max.depth) || max.depth < 0) {
+    stop("Error: Invalid value for max.depth. Please give a positive integer.")
+  }
+  
   ## Sample fraction
   if (!is.numeric(sample.fraction)) {
     stop("Error: Invalid value for sample.fraction. Please give a value in (0,1] or a vector of values in [0,1].")
@@ -493,9 +503,6 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     importance.mode <- 1
   } else if (importance == "impurity_corrected" || importance == "impurity_unbiased") {
     importance.mode <- 5
-    if (!is.null(split.select.weights)) {
-      stop("Corrected impurity importance not supported in combination with split.select.weights.")
-    }
   } else if (importance == "permutation") {
     if (scale.permutation.importance) {
       importance.mode <- 2
@@ -524,6 +531,25 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     if (!replace && sum(case.weights > 0) < sample.fraction * nrow(data.final)) {
       stop("Error: Fewer non-zero case weights than observations to sample.")
     }
+  }
+  
+  ## Manual inbag selection
+  if (is.null(inbag)) {
+    inbag <- list(c(0,0))
+    use.inbag <- FALSE
+  } else if (is.list(inbag)) {
+    use.inbag <- TRUE
+    if (use.case.weights) {
+      stop("Error: Combination of case.weights and inbag not supported.")
+    }
+    if (length(sample.fraction) > 1) {
+      stop("Error: Combination of class-wise sampling and inbag not supported.")
+    }
+    if (length(inbag) != num.trees) {
+      stop("Error: Size of inbag list not equal to number of trees.")
+    }
+  } else {
+    stop("Error: Invalid inbag, expects list of vectors of size num.trees.")
   }
   
   ## Class weights: NULL for no weights (all 1)
@@ -729,7 +755,8 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                       replace, probability, unordered.factor.variables, use.unordered.factor.variables, 
                       save.memory, splitrule.num, case.weights, use.case.weights, class.weights, 
                       predict.all, keep.inbag, sample.fraction, alpha, minprop, holdout, prediction.type, 
-                      num.random.splits, sparse.data, use.sparse.data, order.snps)
+                      num.random.splits, sparse.data, use.sparse.data, order.snps, oob.error, max.depth, 
+                      inbag, use.inbag)
   
   if (length(result) == 0) {
     stop("User interrupt or internal error.")
@@ -741,14 +768,14 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   }
 
   ## Set predictions
-  if (treetype == 1 && is.factor(response)) {
+  if (treetype == 1 && is.factor(response) && oob.error) {
     result$predictions <- integer.to.factor(result$predictions,
                                             levels(response))
     true.values <- integer.to.factor(unlist(data.final[, dependent.variable.name]),
                                      levels(response))
     result$confusion.matrix <- table(true.values, result$predictions, 
                                      dnn = c("true", "predicted"), useNA = "ifany")
-  } else if (treetype == 5) {
+  } else if (treetype == 5 && oob.error) {
     if (is.list(result$predictions)) {
       result$predictions <- do.call(rbind, result$predictions)
     } 
@@ -758,7 +785,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     result$chf <- result$predictions
     result$predictions <- NULL
     result$survival <- exp(-result$chf)
-  } else if (treetype == 9 && !is.matrix(data)) {
+  } else if (treetype == 9 && !is.matrix(data) && oob.error) {
     if (is.list(result$predictions)) {
       result$predictions <- do.call(rbind, result$predictions)
     } 
@@ -797,7 +824,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   ## Write forest object
   if (write.forest) {
     if (is.factor(response)) {
-      result$forest$levels <- levels(droplevels(response))
+      result$forest$levels <- levels(response)
     }
     result$forest$independent.variable.names <- independent.variable.names
     result$forest$treetype <- result$treetype

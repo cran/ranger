@@ -99,14 +99,17 @@ bool Data::loadFromFileWhitespace(std::ifstream& input_file, std::string header_
     double token;
     std::stringstream line_stream(line);
     size_t column = 0;
-    while (line_stream >> token) {
+    while (readFromStream(line_stream, token)) {
       set(column, row, token, error);
       ++column;
     }
     if (column > num_cols) {
-      throw std::runtime_error("Could not open input file. Too many columns in a row.");
+      throw std::runtime_error(
+          std::string("Could not open input file. Too many columns in row ") + std::to_string(row) + std::string("."));
     } else if (column < num_cols) {
-      throw std::runtime_error("Could not open input file. Too few columns in a row. Are all values numeric?");
+      throw std::runtime_error(
+          std::string("Could not open input file. Too few columns in row ") + std::to_string(row)
+              + std::string(". Are all values numeric?"));
     }
     ++row;
   }
@@ -137,7 +140,7 @@ bool Data::loadFromFileOther(std::ifstream& input_file, std::string header_line,
     size_t column = 0;
     while (getline(line_stream, token_string, seperator)) {
       std::stringstream token_stream(token_string);
-      token_stream >> token;
+      readFromStream(token_stream, token);
       set(column, row, token, error);
       ++column;
     }
@@ -148,14 +151,14 @@ bool Data::loadFromFileOther(std::ifstream& input_file, std::string header_line,
 }
 // #nocov end
 
-void Data::getAllValues(std::vector<double>& all_values, std::vector<size_t>& sampleIDs, size_t varID) const {
+void Data::getAllValues(std::vector<double>& all_values, std::vector<size_t>& sampleIDs, size_t varID, size_t start, size_t end) const {
 
   // All values for varID (no duplicates) for given sampleIDs
   if (getUnpermutedVarID(varID) < num_cols_no_snp) {
 
-    all_values.reserve(sampleIDs.size());
-    for (size_t i = 0; i < sampleIDs.size(); ++i) {
-      all_values.push_back(get(sampleIDs[i], varID));
+    all_values.reserve(end-start);
+    for (size_t pos = start; pos < end; ++pos) {
+      all_values.push_back(get(sampleIDs[pos], varID));
     }
     std::sort(all_values.begin(), all_values.end());
     all_values.erase(std::unique(all_values.begin(), all_values.end()), all_values.end());
@@ -165,13 +168,13 @@ void Data::getAllValues(std::vector<double>& all_values, std::vector<size_t>& sa
   }
 }
 
-void Data::getMinMaxValues(double& min, double&max, std::vector<size_t>& sampleIDs, size_t varID) const {
+void Data::getMinMaxValues(double& min, double&max, std::vector<size_t>& sampleIDs, size_t varID, size_t start, size_t end) const {
   if (sampleIDs.size() > 0) {
     min = get(sampleIDs[0], varID);
     max = min;
   }
-  for (size_t i = 1; i < sampleIDs.size(); ++i) {
-    double value = get(sampleIDs[i], varID);
+  for (size_t pos = start; pos < end; ++pos) {
+    double value = get(sampleIDs[pos], varID);
     if (value < min) {
       min = value;
     }

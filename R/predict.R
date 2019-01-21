@@ -62,7 +62,7 @@
 ##'   }
 ##' @references
 ##' \itemize{
-##'   \item Wright, M. N. & Ziegler, A. (2017). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. J Stat Softw 77:1-17. \url{http://dx.doi.org/10.18637/jss.v077.i01}.
+##'   \item Wright, M. N. & Ziegler, A. (2017). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. J Stat Softw 77:1-17. \url{https://doi.org/10.18637/jss.v077.i01}.
 ##'   \item Wager, S., Hastie T., & Efron, B. (2014). Confidence Intervals for Random Forests: The Jackknife and the Infinitesimal Jackknife. J Mach Learn Res 15:1625-1651. \url{http://jmlr.org/papers/v15/wager14a.html}.
 ##'   }
 ##' @seealso \code{\link{ranger}}
@@ -213,7 +213,7 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
         x
       } else {
         new.levels <- setdiff(levels(x), y)
-        factor(x, levels = c(y, new.levels))
+        factor(x, levels = c(y, new.levels), exclude = NULL)
       }
     }, data.used[, idx.norecode], forest$covariate.levels, SIMPLIFY = !is.data.frame(data.used[, idx.norecode]))
   }
@@ -268,7 +268,7 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   }
 
   ## Defaults for variables not needed
-  dependent.variable.name <- "none"
+  dependent.variable.name <- ""
   mtry <- 0
   importance <- 0
   min.node.size <- 0
@@ -295,6 +295,10 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   holdout <- FALSE
   num.random.splits <- 1
   order.snps <- FALSE
+  oob.error <- FALSE
+  max.depth <- 0
+  inbag <- list(c(0,0))
+  use.inbag <- FALSE
   
   ## Use sparse matrix
   if ("dgCMatrix" %in% class(data.final)) {
@@ -316,7 +320,7 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
                       case.weights, use.case.weights, class.weights, 
                       predict.all, keep.inbag, sample.fraction, alpha, minprop, holdout, 
                       prediction.type, num.random.splits, sparse.data, use.sparse.data,
-                      order.snps)
+                      order.snps, oob.error, max.depth, inbag, use.inbag)
 
   if (length(result) == 0) {
     stop("User interrupt or internal error.")
@@ -365,9 +369,8 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
         }
         
         ## Set colnames and sort by levels
-        leveldiff <- max(forest$class.values) - length(forest$levels)
-        colnames(result$predictions) <- forest$levels[forest$class.values - leveldiff]
-        result$predictions <- result$predictions[, forest$levels, drop = FALSE]
+        colnames(result$predictions) <- forest$levels[forest$class.values]
+        result$predictions <- result$predictions[, forest$levels[sort(forest$class.values)], drop = FALSE]
       }
     }
   } else if (type == "terminalNodes") {
@@ -482,7 +485,7 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
 ##'   }
 ##' @references
 ##' \itemize{
-##'   \item Wright, M. N. & Ziegler, A. (2017). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. J Stat Softw 77:1-17. \url{http://dx.doi.org/10.18637/jss.v077.i01}.
+##'   \item Wright, M. N. & Ziegler, A. (2017). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. J Stat Softw 77:1-17. \url{https://doi.org/10.18637/jss.v077.i01}.
 ##'   \item Wager, S., Hastie T., & Efron, B. (2014). Confidence Intervals for Random Forests: The Jackknife and the Infinitesimal Jackknife. J Mach Learn Res 15:1625-1651. \url{http://jmlr.org/papers/v15/wager14a.html}.
 ##'   \item Meinshausen (2006). Quantile Regression Forests. J Mach Learn Res 7:983-999. \url{http://www.jmlr.org/papers/v7/meinshausen06a.html}.  
 ##'   }

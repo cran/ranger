@@ -5,9 +5,9 @@
 \title{Ranger prediction}
 \usage{
 \method{predict}{ranger.forest}(object, data, predict.all = FALSE,
-  num.trees = object$num.trees, type = "response", se.method = "infjack",
-  seed = NULL, num.threads = NULL, verbose = TRUE, inbag.counts = NULL,
-  ...)
+  num.trees = object$num.trees, type = "response",
+  se.method = "infjack", seed = NULL, num.threads = NULL,
+  verbose = TRUE, inbag.counts = NULL, ...)
 }
 \arguments{
 \item{object}{Ranger \code{ranger.forest} object.}
@@ -60,7 +60,7 @@ To retrieve the corresponding factor levels, use \code{rf$forest$levels}, if \co
 }
 \references{
 \itemize{
-  \item Wright, M. N. & Ziegler, A. (2017). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. J Stat Softw 77:1-17. \url{http://dx.doi.org/10.18637/jss.v077.i01}.
+  \item Wright, M. N. & Ziegler, A. (2017). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. J Stat Softw 77:1-17. \url{https://doi.org/10.18637/jss.v077.i01}.
   \item Wager, S., Hastie T., & Efron, B. (2014). Confidence Intervals for Random Forests: The Jackknife and the Infinitesimal Jackknife. J Mach Learn Res 15:1625-1651. \url{http://jmlr.org/papers/v15/wager14a.html}.
   }
 }

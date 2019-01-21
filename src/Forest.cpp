@@ -32,9 +32,9 @@ Forest::Forest() :
     verbose_out(0), num_trees(DEFAULT_NUM_TREE), mtry(0), min_node_size(0), num_variables(0), num_independent_variables(
         0), seed(0), dependent_varID(0), num_samples(0), prediction_mode(false), memory_mode(MEM_DOUBLE), sample_with_replacement(
         true), memory_saving_splitting(false), splitrule(DEFAULT_SPLITRULE), predict_all(false), keep_inbag(false), sample_fraction(
-        { 1 }), holdout(false), prediction_type(DEFAULT_PREDICTIONTYPE), num_random_splits(DEFAULT_NUM_RANDOM_SPLITS), alpha(
-        DEFAULT_ALPHA), minprop(DEFAULT_MINPROP), num_threads(DEFAULT_NUM_THREADS), data { }, overall_prediction_error(
-        0), importance_mode(DEFAULT_IMPORTANCE_MODE), progress(0) {
+        { 1 }), holdout(false), prediction_type(DEFAULT_PREDICTIONTYPE), num_random_splits(DEFAULT_NUM_RANDOM_SPLITS), max_depth(
+        DEFAULT_MAXDEPTH), alpha(DEFAULT_ALPHA), minprop(DEFAULT_MINPROP), num_threads(DEFAULT_NUM_THREADS), data { }, overall_prediction_error(
+    NAN), importance_mode(DEFAULT_IMPORTANCE_MODE), progress(0) {
 }
 
 // #nocov start
@@ -70,7 +70,7 @@ void Forest::initCpp(std::string dependent_variable_name, MemoryMode memory_mode
     std::string status_variable_name, bool sample_with_replacement,
     const std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
     std::string case_weights_file, bool predict_all, double sample_fraction, double alpha, double minprop, bool holdout,
-    PredictionType prediction_type, uint num_random_splits) {
+    PredictionType prediction_type, uint num_random_splits, uint max_depth) {
 
   this->verbose_out = verbose_out;
 
@@ -87,7 +87,8 @@ void Forest::initCpp(std::string dependent_variable_name, MemoryMode memory_mode
   init(dependent_variable_name, memory_mode, load_data_from_file(input_file, memory_mode, verbose_out), mtry,
       output_prefix, num_trees, seed, num_threads, importance_mode, min_node_size, status_variable_name,
       prediction_mode, sample_with_replacement, unordered_variable_names, memory_saving_splitting, splitrule,
-      predict_all, sample_fraction_vector, alpha, minprop, holdout, prediction_type, num_random_splits, false);
+      predict_all, sample_fraction_vector, alpha, minprop, holdout, prediction_type, num_random_splits, false,
+      max_depth);
 
   if (prediction_mode) {
     loadFromFile(load_forest_filename);
@@ -143,9 +144,9 @@ void Forest::initR(std::string dependent_variable_name, std::unique_ptr<Data> in
     std::vector<std::vector<double>>& split_select_weights, const std::vector<std::string>& always_split_variable_names,
     std::string status_variable_name, bool prediction_mode, bool sample_with_replacement,
     const std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
-    std::vector<double>& case_weights, bool predict_all, bool keep_inbag, std::vector<double>& sample_fraction,
-    double alpha, double minprop, bool holdout, PredictionType prediction_type, uint num_random_splits,
-    bool order_snps) {
+    std::vector<double>& case_weights, std::vector<std::vector<size_t>>& manual_inbag, bool predict_all,
+    bool keep_inbag, std::vector<double>& sample_fraction, double alpha, double minprop, bool holdout,
+    PredictionType prediction_type, uint num_random_splits, bool order_snps, uint max_depth) {
 
   this->verbose_out = verbose_out;
 
@@ -153,7 +154,7 @@ void Forest::initR(std::string dependent_variable_name, std::unique_ptr<Data> in
   init(dependent_variable_name, MEM_DOUBLE, std::move(input_data), mtry, "", num_trees, seed, num_threads,
       importance_mode, min_node_size, status_variable_name, prediction_mode, sample_with_replacement,
       unordered_variable_names, memory_saving_splitting, splitrule, predict_all, sample_fraction, alpha, minprop,
-      holdout, prediction_type, num_random_splits, order_snps);
+      holdout, prediction_type, num_random_splits, order_snps, max_depth);
 
   // Set variables to be always considered for splitting
   if (!always_split_variable_names.empty()) {
@@ -173,6 +174,11 @@ void Forest::initR(std::string dependent_variable_name, std::unique_ptr<Data> in
     this->case_weights = case_weights;
   }
 
+  // Set manual inbag
+  if (!manual_inbag.empty()) {
+    this->manual_inbag = manual_inbag;
+  }
+
   // Keep inbag counts
   this->keep_inbag = keep_inbag;
 }
@@ -182,7 +188,7 @@ void Forest::init(std::string dependent_variable_name, MemoryMode memory_mode, s
     uint min_node_size, std::string status_variable_name, bool prediction_mode, bool sample_with_replacement,
     const std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
     bool predict_all, std::vector<double>& sample_fraction, double alpha, double minprop, bool holdout,
-    PredictionType prediction_type, uint num_random_splits, bool order_snps) {
+    PredictionType prediction_type, uint num_random_splits, bool order_snps, uint max_depth) {
 
   // Initialize data with memmode
   this->data = std::move(input_data);
@@ -225,6 +231,7 @@ void Forest::init(std::string dependent_variable_name, MemoryMode memory_mode, s
   this->minprop = minprop;
   this->prediction_type = prediction_type;
   this->num_random_splits = num_random_splits;
+  this->max_depth = max_depth;
 
   // Set number of samples and variables
   num_samples = data->getNumRows();
@@ -249,6 +256,9 @@ void Forest::init(std::string dependent_variable_name, MemoryMode memory_mode, s
   // Init split select weights
   split_select_weights.push_back(std::vector<double>());
 
+  // Init manual inbag
+  manual_inbag.push_back(std::vector<size_t>());
+
   // Check if mtry is in valid range
   if (this->mtry > num_variables - 1) {
     throw std::runtime_error("mtry can not be larger than number of variables in data.");
@@ -270,7 +280,7 @@ void Forest::init(std::string dependent_variable_name, MemoryMode memory_mode, s
   }
 }
 
-void Forest::run(bool verbose) {
+void Forest::run(bool verbose, bool compute_oob_error) {
 
   if (prediction_mode) {
     if (verbose && verbose_out) {
@@ -287,7 +297,10 @@ void Forest::run(bool verbose) {
     if (verbose && verbose_out) {
       *verbose_out << "Computing prediction error .." << std::endl;
     }
-    computePredictionError();
+
+    if (compute_oob_error) {
+      computePredictionError();
+    }
 
     if (importance_mode == IMP_PERM_BREIMAN || importance_mode == IMP_PERM_LIAW || importance_mode == IMP_PERM_RAW) {
       if (verbose && verbose_out) {
@@ -429,10 +442,18 @@ void Forest::grow() {
       tree_split_select_weights = &split_select_weights[0];
     }
 
+    // Get inbag counts for tree
+    std::vector<size_t>* tree_manual_inbag;
+    if (manual_inbag.size() > 1) {
+      tree_manual_inbag = &manual_inbag[i];
+    } else {
+      tree_manual_inbag = &manual_inbag[0];
+    }
+
     trees[i]->init(data.get(), mtry, dependent_varID, num_samples, tree_seed, &deterministic_varIDs,
         &split_select_varIDs, tree_split_select_weights, importance_mode, min_node_size, sample_with_replacement,
-        memory_saving_splitting, splitrule, &case_weights, keep_inbag, &sample_fraction, alpha, minprop, holdout,
-        num_random_splits);
+        memory_saving_splitting, splitrule, &case_weights, tree_manual_inbag, keep_inbag, &sample_fraction, alpha,
+        minprop, holdout, num_random_splits, max_depth);
   }
 
 // Init variable importance
@@ -816,16 +837,21 @@ void Forest::setSplitWeightVector(std::vector<std::vector<double>>& split_select
   }
 
 // Reserve space
+  size_t num_weights = num_independent_variables;
+  if (importance_mode == IMP_GINI_CORRECTED) {
+    num_weights = 2 * num_independent_variables;
+  }
   if (split_select_weights.size() == 1) {
-    this->split_select_weights[0].resize(num_independent_variables);
+    this->split_select_weights[0].resize(num_weights);
   } else {
     this->split_select_weights.clear();
-    this->split_select_weights.resize(num_trees, std::vector<double>(num_independent_variables));
+    this->split_select_weights.resize(num_trees, std::vector<double>(num_weights));
   }
-  this->split_select_varIDs.resize(num_independent_variables);
-  deterministic_varIDs.reserve(num_independent_variables);
+  this->split_select_varIDs.resize(num_weights);
+  deterministic_varIDs.reserve(num_weights);
 
-// Split up in deterministic and weighted variables, ignore zero weights
+  // Split up in deterministic and weighted variables, ignore zero weights
+  size_t num_zero_weights = 0;
   for (size_t i = 0; i < split_select_weights.size(); ++i) {
 
     // Size should be 1 x num_independent_variables or num_trees x num_independent_variables
@@ -849,6 +875,8 @@ void Forest::setSplitWeightVector(std::vector<std::vector<double>>& split_select
         } else if (weight < 1 && weight > 0) {
           this->split_select_varIDs[j] = varID;
           this->split_select_weights[i][j] = weight;
+        } else if (weight == 0) {
+          ++num_zero_weights;
         } else if (weight < 0 || weight > 1) {
           throw std::runtime_error("One or more split select weights not in range [0,1].");
         }
@@ -861,13 +889,31 @@ void Forest::setSplitWeightVector(std::vector<std::vector<double>>& split_select
         }
       }
     }
+
+    // Copy weights for corrected impurity importance
+    if (importance_mode == IMP_GINI_CORRECTED) {
+      std::vector<double>* sw = &(this->split_select_weights[i]);
+      std::copy_n(sw->begin(), num_independent_variables, sw->begin() + num_independent_variables);
+
+      for (size_t k = 0; k < num_independent_variables; ++k) {
+        split_select_varIDs[num_independent_variables + k] = num_variables + k;
+      }
+
+      size_t num_deterministic_varIDs = deterministic_varIDs.size();
+      for (size_t k = 0; k < num_deterministic_varIDs; ++k) {
+        size_t varID = deterministic_varIDs[k];
+        for (auto& skip : data->getNoSplitVariables()) {
+          if (varID >= skip) {
+            --varID;
+          }
+        }
+        deterministic_varIDs.push_back(varID + num_variables);
+      }
+    }
   }
 
-  if (deterministic_varIDs.size() > this->mtry) {
-    throw std::runtime_error("Number of ones in split select weights cannot be larger than mtry.");
-  }
-  if (deterministic_varIDs.size() + split_select_varIDs.size() < mtry) {
-    throw std::runtime_error("Too many zeros in split select weights. Need at least mtry variables to split at.");
+  if (num_weights - deterministic_varIDs.size() - num_zero_weights < mtry) {
+    throw std::runtime_error("Too many zeros or ones in split select weights. Need at least mtry variables to split at.");
   }
 }
 
@@ -883,6 +929,20 @@ void Forest::setAlwaysSplitVariables(const std::vector<std::string>& always_spli
   if (deterministic_varIDs.size() + this->mtry > num_independent_variables) {
     throw std::runtime_error(
         "Number of variables to be always considered for splitting plus mtry cannot be larger than number of independent variables.");
+  }
+
+  // Also add variables for corrected impurity importance
+  if (importance_mode == IMP_GINI_CORRECTED) {
+    size_t num_deterministic_varIDs = deterministic_varIDs.size();
+    for (size_t k = 0; k < num_deterministic_varIDs; ++k) {
+      size_t varID = deterministic_varIDs[k];
+      for (auto& skip : data->getNoSplitVariables()) {
+        if (varID >= skip) {
+          --varID;
+        }
+      }
+      deterministic_varIDs.push_back(varID + num_variables);
+    }
   }
 }
 

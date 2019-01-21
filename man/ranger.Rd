@@ -7,15 +7,16 @@
 \usage{
 ranger(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   importance = "none", write.forest = TRUE, probability = FALSE,
-  min.node.size = NULL, replace = TRUE, sample.fraction = ifelse(replace,
-  1, 0.632), case.weights = NULL, class.weights = NULL, splitrule = NULL,
-  num.random.splits = 1, alpha = 0.5, minprop = 0.1,
-  split.select.weights = NULL, always.split.variables = NULL,
-  respect.unordered.factors = NULL, scale.permutation.importance = FALSE,
-  keep.inbag = FALSE, holdout = FALSE, quantreg = FALSE,
-  num.threads = NULL, save.memory = FALSE, verbose = TRUE, seed = NULL,
-  dependent.variable.name = NULL, status.variable.name = NULL,
-  classification = NULL)
+  min.node.size = NULL, max.depth = NULL, replace = TRUE,
+  sample.fraction = ifelse(replace, 1, 0.632), case.weights = NULL,
+  class.weights = NULL, splitrule = NULL, num.random.splits = 1,
+  alpha = 0.5, minprop = 0.1, split.select.weights = NULL,
+  always.split.variables = NULL, respect.unordered.factors = NULL,
+  scale.permutation.importance = FALSE, keep.inbag = FALSE,
+  inbag = NULL, holdout = FALSE, quantreg = FALSE,
+  oob.error = TRUE, num.threads = NULL, save.memory = FALSE,
+  verbose = TRUE, seed = NULL, dependent.variable.name = NULL,
+  status.variable.name = NULL, classification = NULL)
 }
 \arguments{
 \item{formula}{Object of class \code{formula} or \code{character} describing the model to fit. Interaction terms supported only for numerical variables.}
@@ -33,6 +34,8 @@ ranger(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
 \item{probability}{Grow a probability forest as in Malley et al. (2012).}
 
 \item{min.node.size}{Minimal node size. Default 1 for classification, 5 for regression, 3 for survival, and 10 for probability.}
+
+\item{max.depth}{Maximal tree depth. A value of NULL or 0 (the default) corresponds to unlimited depth, 1 to tree stumps (1 split per tree).}
 
 \item{replace}{Sample with replacement.}
 
@@ -60,9 +63,13 @@ ranger(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
 
 \item{keep.inbag}{Save how often observations are in-bag in each tree.}
 
+\item{inbag}{Manually set observations per tree. List of size num.trees, containing inbag counts for each observation. Can be used for stratified sampling.}
+
 \item{holdout}{Hold-out mode. Hold-out all samples with case weight 0 and use these for variable importance and prediction error.}
 
 \item{quantreg}{Prepare quantile prediction as in quantile regression forests (Meinshausen 2006). Regression only. Set \code{keep.inbag = TRUE} to prepare out-of-bag quantile prediction.}
+
+\item{oob.error}{Compute OOB prediction error. Set to \code{FALSE} to save computation time, e.g. for large survival forests.}
 
 \item{num.threads}{Number of threads. Default is number of CPUs available.}
 
@@ -199,18 +206,18 @@ ranger(trait ~ ., data = dat.gwaa)
 }
 \references{
 \itemize{
-  \item Wright, M. N. & Ziegler, A. (2017). ranger: A fast implementation of random forests for high dimensional data in C++ and R. J Stat Softw 77:1-17. \url{http://dx.doi.org/10.18637/jss.v077.i01}.
-  \item Schmid, M., Wright, M. N. & Ziegler, A. (2016). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Syst Appl 63:450-459. \url{http://dx.doi.org/10.1016/j.eswa.2016.07.018}. 
-  \item Wright, M. N., Dankowski, T. & Ziegler, A. (2017). Unbiased split variable selection for random survival forests using maximally selected rank statistics. Stat Med 36:1272-1284. \url{http://dx.doi.org/10.1002/sim.7212}.
-  \item Nembrini, S., Koenig, I. R. & Wright, M. N. (2018). The revival of the Gini Importance? Bioinformatics. \url{http://dx.doi.org/10.1093/bioinformatics/bty373}.
-  \item Breiman, L. (2001). Random forests. Mach Learn, 45:5-32. \url{http://dx.doi.org/10.1023/A:1010933404324}. 
-  \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat 2:841-860. \url{http://dx.doi.org/10.1097/JTO.0b013e318233d835}. 
-  \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med 51:74-81. \url{http://dx.doi.org/10.3414/ME00-01-0052}.
+  \item Wright, M. N. & Ziegler, A. (2017). ranger: A fast implementation of random forests for high dimensional data in C++ and R. J Stat Softw 77:1-17. \url{https://doi.org/10.18637/jss.v077.i01}.
+  \item Schmid, M., Wright, M. N. & Ziegler, A. (2016). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Syst Appl 63:450-459. \url{https://doi.org/10.1016/j.eswa.2016.07.018}. 
+  \item Wright, M. N., Dankowski, T. & Ziegler, A. (2017). Unbiased split variable selection for random survival forests using maximally selected rank statistics. Stat Med 36:1272-1284. \url{https://doi.org/10.1002/sim.7212}.
+  \item Nembrini, S., Koenig, I. R. & Wright, M. N. (2018). The revival of the Gini Importance? Bioinformatics. \url{https://doi.org/10.1093/bioinformatics/bty373}.
+  \item Breiman, L. (2001). Random forests. Mach Learn, 45:5-32. \url{https://doi.org/10.1023/A:1010933404324}. 
+  \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat 2:841-860. \url{https://doi.org/10.1097/JTO.0b013e318233d835}. 
+  \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med 51:74-81. \url{https://doi.org/10.3414/ME00-01-0052}.
   \item Hastie, T., Tibshirani, R., Friedman, J. (2009). The Elements of Statistical Learning. Springer, New York. 2nd edition.
-  \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \url{http://dx.doi.org/10.1007/s10994-006-6226-1}.
+  \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \url{https://doi.org/10.1007/s10994-006-6226-1}.
   \item Meinshausen (2006). Quantile Regression Forests. J Mach Learn Res 7:983-999. \url{http://www.jmlr.org/papers/v7/meinshausen06a.html}.  
-  \item Sandri, M. & Zuccolotto, P. (2008). A bias correction algorithm for the Gini variable importance measure in classification trees. J Comput Graph Stat, 17:611-628. \url{http://dx.doi.org/10.1198/106186008X344522}.
-  \item Coppersmith D., Hong S. J., Hosking J. R. (1999). Partitioning nominal attributes in decision trees. Data Min Knowl Discov 3:197-217. \url{http://dx.doi.org/10.1023/A:1009869804967}.
+  \item Sandri, M. & Zuccolotto, P. (2008). A bias correction algorithm for the Gini variable importance measure in classification trees. J Comput Graph Stat, 17:611-628. \url{https://doi.org/10.1198/106186008X344522}.
+  \item Coppersmith D., Hong S. J., Hosking J. R. (1999). Partitioning nominal attributes in decision trees. Data Min Knowl Discov 3:197-217. \url{https://doi.org/10.1023/A:1009869804967}.
   }
 }
 \seealso{

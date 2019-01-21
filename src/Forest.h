@@ -47,25 +47,26 @@ public:
       std::string status_variable_name, bool sample_with_replacement,
       const std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
       std::string case_weights_file, bool predict_all, double sample_fraction, double alpha, double minprop,
-      bool holdout, PredictionType prediction_type, uint num_random_splits);
+      bool holdout, PredictionType prediction_type, uint num_random_splits, uint max_depth);
   void initR(std::string dependent_variable_name, std::unique_ptr<Data> input_data, uint mtry, uint num_trees,
       std::ostream* verbose_out, uint seed, uint num_threads, ImportanceMode importance_mode, uint min_node_size,
       std::vector<std::vector<double>>& split_select_weights,
       const std::vector<std::string>& always_split_variable_names, std::string status_variable_name,
       bool prediction_mode, bool sample_with_replacement, const std::vector<std::string>& unordered_variable_names,
-      bool memory_saving_splitting, SplitRule splitrule, std::vector<double>& case_weights, bool predict_all,
-      bool keep_inbag, std::vector<double>& sample_fraction, double alpha, double minprop, bool holdout,
-      PredictionType prediction_type, uint num_random_splits, bool order_snps);
+      bool memory_saving_splitting, SplitRule splitrule, std::vector<double>& case_weights,
+      std::vector<std::vector<size_t>>& manual_inbag, bool predict_all, bool keep_inbag,
+      std::vector<double>& sample_fraction, double alpha, double minprop, bool holdout, PredictionType prediction_type,
+      uint num_random_splits, bool order_snps, uint max_depth);
   void init(std::string dependent_variable_name, MemoryMode memory_mode, std::unique_ptr<Data> input_data, uint mtry,
       std::string output_prefix, uint num_trees, uint seed, uint num_threads, ImportanceMode importance_mode,
       uint min_node_size, std::string status_variable_name, bool prediction_mode, bool sample_with_replacement,
       const std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
       bool predict_all, std::vector<double>& sample_fraction, double alpha, double minprop, bool holdout,
-      PredictionType prediction_type, uint num_random_splits, bool order_snps);
+      PredictionType prediction_type, uint num_random_splits, bool order_snps, uint max_depth);
   virtual void initInternal(std::string status_variable_name) = 0;
 
   // Grow or predict
-  void run(bool verbose);
+  void run(bool verbose, bool compute_oob_error);
 
   // Write results to output files
   void writeOutput();
@@ -198,6 +199,7 @@ protected:
   bool holdout;
   PredictionType prediction_type;
   uint num_random_splits;
+  uint max_depth;
 
   // MAXSTAT splitrule
   double alpha;
@@ -225,6 +227,9 @@ protected:
 
   // Bootstrap weights
   std::vector<double> case_weights;
+
+  // Pre-selected bootstrap samples (per tree)
+  std::vector<std::vector<size_t>> manual_inbag;
 
   // Random number generator
   std::mt19937_64 random_number_generator;
