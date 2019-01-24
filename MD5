@@ -1,6 +1,6 @@
-84a837664205b9bc488138b3ab7536f3 *DESCRIPTION
+90cf227db05a6824559f0adf313e0841 *DESCRIPTION
 8a28e9291c7e6ecf59661ab825c17cb4 *NAMESPACE
-359c40ec7282d616c91272ec15f8a0cf *NEWS
+b5571b17f782ff8be8af968696030865 *NEWS
 abdef262716494502d3860c667d94805 *R/RcppExports.R
 ea58cf5526b9e4f608f6cc5020183829 *R/csrf.R
 007a1825a6dde1b0e0cd7ba03ffaf2bf *R/formula.R
@@ -35,7 +35,7 @@ a8bd4bf79b2a0a5de8baa1d3e2086a32 *man/print.ranger.forest.Rd
 ce6576881be1c4cdc985fe14aca596d2 *man/timepoints.ranger.prediction.Rd
 d399c104a3203d09b97d9195e49eb986 *man/treeInfo.Rd
 1337f027b94f486bb3899ca32bed8e5a *src/AAA_check_cpp11.cpp
-0897bffde246671f6e8609842d4d1024 *src/Data.cpp
+cebd5b06f0d963c0245e737c276508fa *src/Data.cpp
 ee2d1ba2e2b412bbc1f54e4338bab1cb *src/Data.h
 4b8645b52cafa8d46d637d4267d1cde0 *src/DataChar.cpp
 c320753630097f021869f0422895b6ce *src/DataChar.h
@@ -86,7 +86,7 @@ e00bc6bd710d66e310c02e2cb05626ed *tests/testthat/test_formula.R
 b8d9a4277558108cebc56979334b2999 *tests/testthat/test_importance_pvalues.R
 4211c78c8274642f1fcf4835f2e67e9a *tests/testthat/test_inbag.R
 445dcbf3d710f76602c82633e6af8f4f *tests/testthat/test_interface.R
-b0e1cb8a8960d45e6bfa4be3725a6b08 *tests/testthat/test_jackknife.R
+6d280d61f1aec27fb4392f7072e6ebe4 *tests/testthat/test_jackknife.R
 a1905f737f1fa0ed6714e03873ab3ce9 *tests/testthat/test_maxstat.R
 8001ae04b98a5b32d00c49e74cff161f *tests/testthat/test_predict.R
 bad1e6fd469305f9042cf942ad4cfa50 *tests/testthat/test_print.R
@@ -95,7 +95,7 @@ bad1e6fd469305f9042cf942ad4cfa50 *tests/testthat/test_print.R
 4ebdf37629b1ff46bc207855a97f824a *tests/testthat/test_ranger.R
 57ca4fb60e6024bb860825e031f59cc5 *tests/testthat/test_regression.R
 0a7875ac6b50828fe98af36ef064ee55 *tests/testthat/test_seed.R
-6b4087b0732be5c318b3a198ab3d1da7 *tests/testthat/test_sparse.R
+3bc4ee5dff933b0252d62c4b15a8b9cb *tests/testthat/test_sparse.R
 7952f800112e25cf07990040aad62c4e *tests/testthat/test_splitweights.R
 0efa9b1a697f019cb84673ee9f55bc74 *tests/testthat/test_survival.R
 bd7a766b6a33582c459dab0128258a06 *tests/testthat/test_treeInfo.R
