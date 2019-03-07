@@ -1,6 +1,6 @@
-90cf227db05a6824559f0adf313e0841 *DESCRIPTION
+98f02229241049475633424fd824b2b2 *DESCRIPTION
 8a28e9291c7e6ecf59661ab825c17cb4 *NAMESPACE
-b5571b17f782ff8be8af968696030865 *NEWS
+a103769895d504b388aea8c8ba67fef9 *NEWS
 abdef262716494502d3860c667d94805 *R/RcppExports.R
 ea58cf5526b9e4f608f6cc5020183829 *R/csrf.R
 007a1825a6dde1b0e0cd7ba03ffaf2bf *R/formula.R
@@ -86,7 +86,7 @@ e00bc6bd710d66e310c02e2cb05626ed *tests/testthat/test_formula.R
 b8d9a4277558108cebc56979334b2999 *tests/testthat/test_importance_pvalues.R
 4211c78c8274642f1fcf4835f2e67e9a *tests/testthat/test_inbag.R
 445dcbf3d710f76602c82633e6af8f4f *tests/testthat/test_interface.R
-6d280d61f1aec27fb4392f7072e6ebe4 *tests/testthat/test_jackknife.R
+b1e3b10c2fa3507a423d701af1643222 *tests/testthat/test_jackknife.R
 a1905f737f1fa0ed6714e03873ab3ce9 *tests/testthat/test_maxstat.R
 8001ae04b98a5b32d00c49e74cff161f *tests/testthat/test_predict.R
 bad1e6fd469305f9042cf942ad4cfa50 *tests/testthat/test_print.R
