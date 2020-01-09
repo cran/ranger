@@ -20,12 +20,11 @@
 
 namespace ranger {
 
-void ForestRegression::loadForest(size_t dependent_varID, size_t num_trees,
+void ForestRegression::loadForest(size_t num_trees,
     std::vector<std::vector<std::vector<size_t>> >& forest_child_nodeIDs,
     std::vector<std::vector<size_t>>& forest_split_varIDs, std::vector<std::vector<double>>& forest_split_values,
     std::vector<bool>& is_ordered_variable) {
 
-  this->dependent_varID = dependent_varID;
   this->num_trees = num_trees;
   data->setIsOrderedVariable(is_ordered_variable);
 
@@ -40,17 +39,27 @@ void ForestRegression::loadForest(size_t dependent_varID, size_t num_trees,
   equalSplit(thread_ranges, 0, num_trees - 1, num_threads);
 }
 
-void ForestRegression::initInternal(std::string status_variable_name) {
+void ForestRegression::initInternal() {
 
   // If mtry not set, use floored square root of number of independent variables
   if (mtry == 0) {
-    unsigned long temp = sqrt((double) (num_variables - 1));
+    unsigned long temp = sqrt((double) num_independent_variables);
     mtry = std::max((unsigned long) 1, temp);
   }
 
   // Set minimal node size
   if (min_node_size == 0) {
     min_node_size = DEFAULT_MIN_NODE_SIZE_REGRESSION;
+  }
+
+  // Error if beta splitrule used with data outside of [0,1]
+  if (splitrule == BETA) {
+    for (size_t i = 0; i < num_samples; ++i) {
+      double y = data->get_y(i, 0);
+      if (y < 0 || y > 1) {
+        throw std::runtime_error("Beta splitrule applicable to regression data with outcome between 0 and 1 only.");
+      }
+    }
   }
 
   // Sort data if memory saving mode
@@ -122,7 +131,7 @@ void ForestRegression::computePredictionErrorInternal() {
       ++num_predictions;
       predictions[0][0][i] /= (double) samples_oob_count[i];
       double predicted_value = predictions[0][0][i];
-      double real_value = data->get(i, dependent_varID);
+      double real_value = data->get_y(i, 0);
       overall_prediction_error += (predicted_value - real_value) * (predicted_value - real_value);
     } else {
       predictions[0][0][i] = NAN;
@@ -196,7 +205,7 @@ void ForestRegression::writePredictionFile() {
 void ForestRegression::saveToFileInternal(std::ofstream& outfile) {
 
 // Write num_variables
-  outfile.write((char*) &num_variables, sizeof(num_variables));
+  outfile.write((char*) &num_independent_variables, sizeof(num_independent_variables));
 
 // Write treetype
   TreeType treetype = TREE_REGRESSION;
@@ -226,13 +235,9 @@ void ForestRegression::loadFromFileInternal(std::ifstream& infile) {
     std::vector<double> split_values;
     readVector1D(split_values, infile);
 
-    // If dependent variable not in test data, change variable IDs accordingly
-    if (num_variables_saved > num_variables) {
-      for (auto& varID : split_varIDs) {
-        if (varID >= dependent_varID) {
-          --varID;
-        }
-      }
+    // If dependent variable not in test data, throw error
+    if (num_variables_saved != num_independent_variables) {
+      throw std::runtime_error("Number of independent variables in data does not match with the loaded forest.");
     }
 
     // Create tree

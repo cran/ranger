@@ -4,8 +4,14 @@
 \alias{importance_pvalues}
 \title{ranger variable importance p-values}
 \usage{
-importance_pvalues(x, method = c("janitza", "altmann"),
-  num.permutations = 100, formula = NULL, data = NULL, ...)
+importance_pvalues(
+  x,
+  method = c("janitza", "altmann"),
+  num.permutations = 100,
+  formula = NULL,
+  data = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{\code{ranger} or \code{holdoutRF} object.}
@@ -43,8 +49,6 @@ However, much larger numbers have to be used to estimate more precise p-values.
 We add 1 to the numerator and denominator to avoid zero p-values.
 }
 \examples{
-require(ranger)
-
 ## Janitza's p-values with corrected Gini importance
 n <- 50
 p <- 400

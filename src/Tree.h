@@ -35,13 +35,13 @@ public:
   Tree(const Tree&) = delete;
   Tree& operator=(const Tree&) = delete;
 
-  void init(const Data* data, uint mtry, size_t dependent_varID, size_t num_samples, uint seed,
+  void init(const Data* data, uint mtry, size_t num_samples, uint seed,
       std::vector<size_t>* deterministic_varIDs, std::vector<size_t>* split_select_varIDs,
       std::vector<double>* split_select_weights, ImportanceMode importance_mode, uint min_node_size,
       bool sample_with_replacement, bool memory_saving_splitting, SplitRule splitrule,
       std::vector<double>* case_weights, std::vector<size_t>* manual_inbag, bool keep_inbag,
       std::vector<double>* sample_fraction, double alpha, double minprop, bool holdout, uint num_random_splits,
-      uint max_depth);
+      uint max_depth, std::vector<double>* regularization_factor, bool regularization_usedepth, std::vector<bool>* split_varIDs_used);
 
   virtual void allocateMemory() = 0;
 
@@ -49,7 +49,8 @@ public:
 
   void predict(const Data* prediction_data, bool oob_prediction);
 
-  void computePermutationImportance(std::vector<double>& forest_importance, std::vector<double>& forest_variance);
+  void computePermutationImportance(std::vector<double>& forest_importance, std::vector<double>& forest_variance,
+      std::vector<double>& forest_importance_casewise);
 
   void appendToFile(std::ofstream& file);
   virtual void appendToFileInternal(std::ofstream& file) = 0;
@@ -87,8 +88,8 @@ protected:
   size_t dropDownSamplePermuted(size_t permuted_varID, size_t sampleID, size_t permuted_sampleID);
   void permuteAndPredictOobSamples(size_t permuted_varID, std::vector<size_t>& permutations);
 
-  virtual double computePredictionAccuracyInternal() = 0;
-
+  virtual double computePredictionAccuracyInternal(std::vector<double>* prediction_error_casewise) = 0;
+  
   void bootstrap();
   void bootstrapWithoutReplacement();
 
@@ -102,7 +103,50 @@ protected:
 
   virtual void cleanUpInternal() = 0;
 
-  size_t dependent_varID;
+  void regularize(double& decrease, size_t varID) {
+    if (regularization) {
+      if (importance_mode == IMP_GINI_CORRECTED) {
+        varID = data->getUnpermutedVarID(varID);
+      }
+      if ((*regularization_factor)[varID] != 1) {
+        if (!(*split_varIDs_used)[varID]) {
+          if (regularization_usedepth) {
+            decrease *= std::pow((*regularization_factor)[varID], depth + 1);
+          } else {
+            decrease *= (*regularization_factor)[varID];
+          }
+        }
+      }
+    }
+  }
+
+  void regularizeNegative(double& decrease, size_t varID) {
+      if (regularization) {
+        if (importance_mode == IMP_GINI_CORRECTED) {
+          varID = data->getUnpermutedVarID(varID);
+        }
+        if ((*regularization_factor)[varID] != 1) {
+          if (!(*split_varIDs_used)[varID]) {
+            if (regularization_usedepth) {
+              decrease /= std::pow((*regularization_factor)[varID], depth + 1);
+            } else {
+              decrease /= (*regularization_factor)[varID];
+            }
+          }
+        }
+      }
+    }
+
+  void saveSplitVarID(size_t varID) {
+    if (regularization) {
+      if (importance_mode == IMP_GINI_CORRECTED) {
+        (*split_varIDs_used)[data->getUnpermutedVarID(varID)] = true;
+      } else {
+        (*split_varIDs_used)[varID] = true;
+      }
+    }
+  }
+
   uint mtry;
 
   // Number of samples (all samples, not only inbag for this tree)
@@ -159,6 +203,12 @@ protected:
   // Pointer to original data
   const Data* data;
 
+  // Regularization
+  bool regularization;
+  std::vector<double>* regularization_factor;
+  bool regularization_usedepth;
+  std::vector<bool>* split_varIDs_used;
+  
   // Variable importance for all variables
   std::vector<double>* variable_importance;
   ImportanceMode importance_mode;

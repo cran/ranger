@@ -1,7 +1,13 @@
-##### Version 0.11.2
-* Bug fixes
 
-##### Version 0.11.1
+##### Version 0.12.0
+* Faster computation (in some cases)
+* Add local variable importance 
+* Add "hellinger" splitrule for binary classification
+* Add "beta" splitrule for bounded outcomes
+* Accept user-specified function in quantile prediction
+* Add regularization
+* Add x/y interface
+* Internal changes (seed differences possible, prediction incompatible with older versions)
 * Bug fixes
 
 ##### Version 0.11.0

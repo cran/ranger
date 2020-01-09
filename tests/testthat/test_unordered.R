@@ -123,6 +123,43 @@ test_that("Order splitting working with alternative interface", {
   expect_true(all(rf$forest$is.ordered))
 })
 
+test_that("Order splitting working with single level factor", {
+  n <- 20
+  
+  # Binary classification
+  dt_class <- data.frame(x = sample(c("A"), n, replace = TRUE), 
+                         y = factor(sample(c("A", "B"), n, replace = TRUE)),
+                         stringsAsFactors = FALSE)
+  expect_silent(ranger(y ~ ., data = dt_class, num.trees = 5, 
+                       respect.unordered.factors = 'order', probability = FALSE))
+  expect_silent(ranger(y ~ ., data = dt_class, num.trees = 5, 
+                       respect.unordered.factors = 'order', probability = TRUE))
+  
+  # Multiclass classification
+  dt_mult <- data.frame(x = sample(c("A"), n, replace = TRUE), 
+                        y = factor(sample(c("A", "B", "C", "D"), n, replace = TRUE)),
+                        stringsAsFactors = FALSE)
+  expect_silent(ranger(y ~ ., data = dt_class, num.trees = 5, 
+                       respect.unordered.factors = 'order', probability = FALSE))
+  expect_silent(ranger(y ~ ., data = dt_class, num.trees = 5, 
+                       respect.unordered.factors = 'order', probability = TRUE))
+  
+  # Regression
+  dt_cont <- data.frame(x = sample(c("A"), n, replace = TRUE), 
+                        y = rnorm(n),
+                        stringsAsFactors = FALSE)
+  expect_silent(ranger(y ~ ., data = dt_cont, num.trees = 5, 
+                       respect.unordered.factors = 'order'))
+  
+  # Survival
+  dt_surv <- data.frame(x = sample(c("A"), n, replace = TRUE), 
+                        time = rnorm(n),
+                        status = rbinom(n, 1, .5),
+                        stringsAsFactors = FALSE)
+  expect_silent(ranger(Surv(time, status) ~ ., data = dt_surv, num.trees = 5, 
+                       respect.unordered.factors = 'order'))
+})
+
 test_that("Unordered splitting working for survival", {
   rf <- ranger(Surv(time, status) ~ ., veteran, num.trees = 5, min.node.size = 50, respect.unordered.factors = 'partition')
   expect_true(any(!rf$forest$is.ordered))
@@ -235,3 +272,74 @@ test_that("No error if NA factor levels and order", {
   expect_silent(ranger(dependent.variable.name = "y", data = df, 
                 respect.unordered.factors = "order"))
 })
+
+test_that("Order splitting working when numerics in data", {
+  n <- 20
+  
+  # Binary classification
+  dt_class <- data.frame(x1 = sample(c("A", "B", "C"), n, replace = TRUE), 
+                         x2 = sample(1:3, n, replace = TRUE),
+                         y = factor(sample(c("A", "B"), n, replace = TRUE)),
+                         stringsAsFactors = FALSE)
+  rf <- expect_silent(ranger(y ~ ., data = dt_class, num.trees = 5, 
+                       respect.unordered.factors = 'order', probability = FALSE))
+  expect_silent(predict(rf, dt_class))
+  rf <- expect_silent(ranger(y ~ ., data = dt_class, num.trees = 5, 
+                       respect.unordered.factors = 'order', probability = TRUE))
+  expect_silent(predict(rf, dt_class))
+  
+  # Multiclass classification
+  dt_mult <- data.frame(x1 = sample(c("A", "B", "C"), n, replace = TRUE), 
+                        x2 = sample(1:3, n, replace = TRUE),
+                        y = factor(sample(c("A", "B", "C", "D"), n, replace = TRUE)),
+                        stringsAsFactors = FALSE)
+  rf <- expect_silent(ranger(y ~ ., data = dt_class, num.trees = 5, 
+                       respect.unordered.factors = 'order', probability = FALSE))
+  expect_silent(predict(rf, dt_mult))
+  rf <- expect_silent(ranger(y ~ ., data = dt_class, num.trees = 5, 
+                       respect.unordered.factors = 'order', probability = TRUE))
+  expect_silent(predict(rf, dt_mult))
+  
+  # Regression
+  dt_cont <- data.frame(x1 = sample(c("A", "B", "C"), n, replace = TRUE), 
+                        x2 = sample(1:3, n, replace = TRUE),
+                        y = rnorm(n),
+                        stringsAsFactors = FALSE)
+  rf <- expect_silent(ranger(y ~ ., data = dt_cont, num.trees = 5, 
+                       respect.unordered.factors = 'order'))
+  expect_silent(predict(rf, dt_cont))
+  
+  # Survival
+  dt_surv <- data.frame(x1 = sample(c("A", "B", "C"), n, replace = TRUE), 
+                        x2 = as.numeric(sample(1:3, n, replace = TRUE)),
+                        time = rnorm(n),
+                        status = rbinom(n, 1, .5),
+                        stringsAsFactors = FALSE)
+  rf <- expect_silent(ranger(Surv(time, status) ~ ., data = dt_surv, num.trees = 5, 
+                       respect.unordered.factors = 'order'))
+  expect_silent(predict(rf, dt_surv))
+  
+  # Survival with Surv() in data
+  dt_surv <- data.frame(x1 = sample(c("A", "B", "C"), n, replace = TRUE), 
+                        x2 = as.numeric(sample(1:3, n, replace = TRUE)),
+                        y = Surv(rnorm(n), rbinom(n, 1, .5)),
+                        stringsAsFactors = FALSE)
+  rf <- expect_silent(ranger(y ~ ., data = dt_surv, num.trees = 5, 
+                             respect.unordered.factors = 'order'))
+  expect_silent(predict(rf, dt_surv))
+})
+
+test_that("Partition splitting working for large number of levels", {
+  n <- 43
+  dt <- data.frame(x = factor(1:n, ordered = FALSE),  
+                   y = rbinom(n, 1, 0.5))
+  
+  rf <- ranger(y ~ ., data = dt, num.trees = 10, splitrule = "extratrees")
+  
+  max_split <- max(sapply(1:rf$num.trees, function(i) {
+    max(log2(rf$forest$split.values[[i]]), na.rm = TRUE)
+  }))
+
+  expect_lte(max_split, n)
+})
+

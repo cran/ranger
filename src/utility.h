@@ -149,6 +149,16 @@ void loadDoubleVectorFromFile(std::vector<double>& result, std::string filename)
 // #nocov end
 
 /**
+ * Draw random numbers in a range without replacements.
+ * @param result Vector to add results to. Will not be cleaned before filling.
+ * @param random_number_generator Random number generator
+ * @param range_length Length of range. Interval to draw from: 0..max-1
+ * @param num_samples Number of samples to draw
+ */
+void drawWithoutReplacement(std::vector<size_t>& result, std::mt19937_64& random_number_generator, size_t range_length,
+    size_t num_samples);
+
+/**
  * Draw random numbers in a range without replacement and skip values.
  * @param result Vector to add results to. Will not be cleaned before filling.
  * @param random_number_generator Random number generator
@@ -164,6 +174,16 @@ void drawWithoutReplacementSkip(std::vector<size_t>& result, std::mt19937_64& ra
  * @param result Vector to add results to. Will not be cleaned before filling.
  * @param random_number_generator Random number generator
  * @param range_length Length of range. Interval to draw from: 0..max-1
+ * @param num_samples Number of samples to draw
+ */
+void drawWithoutReplacementSimple(std::vector<size_t>& result, std::mt19937_64& random_number_generator, size_t max,
+    size_t num_samples);
+
+/**
+ * Simple algorithm for sampling without replacement (skip values), faster for smaller num_samples
+ * @param result Vector to add results to. Will not be cleaned before filling.
+ * @param random_number_generator Random number generator
+ * @param range_length Length of range. Interval to draw from: 0..max-1
  * @param skip Values to skip
  * @param num_samples Number of samples to draw
  */
@@ -172,6 +192,16 @@ void drawWithoutReplacementSimple(std::vector<size_t>& result, std::mt19937_64& 
 
 /**
  * Fisher Yates algorithm for sampling without replacement.
+ * @param result Vector to add results to. Will not be cleaned before filling.
+ * @param random_number_generator Random number generator
+ * @param max Length of range. Interval to draw from: 0..max-1
+ * @param num_samples Number of samples to draw
+ */
+void drawWithoutReplacementFisherYates(std::vector<size_t>& result, std::mt19937_64& random_number_generator,
+    size_t max, size_t num_samples);
+
+/**
+ * Fisher Yates algorithm for sampling without replacement (skip values).
  * @param result Vector to add results to. Will not be cleaned before filling.
  * @param random_number_generator Random number generator
  * @param max Length of range. Interval to draw from: 0..max-1
@@ -273,13 +303,13 @@ double mostFrequentValue(const std::unordered_map<double, size_t>& class_count,
  * Compute concordance index for given data and summed cumulative hazard function/estimate
  * @param data Reference to Data object
  * @param sum_chf Summed chf over timepoints for each sample
- * @param dependent_varID ID of dependent variable
- * @param status_varID ID of status variable
  * @param sample_IDs IDs of samples, for example OOB samples
+ * @param prediction_error_casewise An optional output vector with casewise prediction errors.
+ *   If pointer is NULL, casewise prediction errors should not be computed.
  * @return concordance index
  */
-double computeConcordanceIndex(const Data& data, const std::vector<double>& sum_chf, size_t dependent_varID,
-    size_t status_varID, const std::vector<size_t>& sample_IDs);
+double computeConcordanceIndex(const Data& data, const std::vector<double>& sum_chf,
+    const std::vector<size_t>& sample_IDs, std::vector<double>* prediction_error_casewise);
 
 /**
  * Convert a unsigned integer to string
@@ -304,12 +334,20 @@ std::string beautifyTime(uint seconds);
 size_t roundToNextMultiple(size_t value, uint multiple);
 
 /**
- * Split string in parts separated by character.
+ * Split string in string parts separated by character.
  * @param result Splitted string
  * @param input String to be splitted
  * @param split_char Char to separate parts
  */
 void splitString(std::vector<std::string>& result, const std::string& input, char split_char);
+
+/**
+ * Split string in double parts separated by character.
+ * @param result Splitted string
+ * @param input String to be splitted
+ * @param split_char Char to separate parts
+ */
+void splitString(std::vector<double>& result, const std::string& input, char split_char);
 
 /**
  * Create numbers from 0 to n_all-1, shuffle and split in two parts.
@@ -488,6 +526,15 @@ std::vector<size_t> numSamplesLeftOfCutpoint(std::vector<double>& x, const std::
  * @return Input string stream with removed failbit if subnormal number
  */
 std::stringstream& readFromStream(std::stringstream& in, double& token);
+
+/**
+ * Compute log-likelihood of beta distribution
+ * @param y Response
+ * @param mean Mean
+ * @param phi Phi
+ * @return Log-likelihood
+ */
+double betaLogLik(double y, double mean, double phi);
 
 // User interrupt from R
 #ifdef R_BUILD

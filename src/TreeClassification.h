@@ -52,7 +52,7 @@ private:
   bool splitNodeInternal(size_t nodeID, std::vector<size_t>& possible_split_varIDs) override;
   void createEmptyNodeInternal() override;
 
-  double computePredictionAccuracyInternal() override;
+  double computePredictionAccuracyInternal(std::vector<double>* prediction_error_casewise) override;
 
   // Called by splitNodeInternal(). Sets split_varIDs and split_values.
   bool findBestSplit(size_t nodeID, std::vector<size_t>& possible_split_varIDs);
@@ -61,8 +61,8 @@ private:
       double& best_decrease);
   void findBestSplitValueSmallQ(size_t nodeID, size_t varID, size_t num_classes,
       const std::vector<size_t>& class_counts, size_t num_samples_node, double& best_value, size_t& best_varID,
-      double& best_decrease, const std::vector<double>& possible_split_values, std::vector<size_t>& class_counts_right,
-      std::vector<size_t>& n_right);
+      double& best_decrease, const std::vector<double>& possible_split_values, std::vector<size_t>& counter_per_class,
+      std::vector<size_t>& counter);
   void findBestSplitValueLargeQ(size_t nodeID, size_t varID, size_t num_classes,
       const std::vector<size_t>& class_counts, size_t num_samples_node, double& best_value, size_t& best_varID,
       double& best_decrease);

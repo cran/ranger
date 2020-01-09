@@ -1,8 +1,8 @@
 Package: ranger
 Type: Package
 Title: A Fast Implementation of Random Forests
-Version: 0.11.2
-Date: 2019-03-07
+Version: 0.12.0
+Date: 2020-01-02
 Author: Marvin N. Wright [aut, cre], Stefan Wager [ctb], Philipp Probst [ctb]
 Maintainer: Marvin N. Wright <cran@wrig.de>
 Description: A fast implementation of Random Forests, particularly suited for high
@@ -16,10 +16,11 @@ Imports: Rcpp (>= 0.11.2), Matrix
 LinkingTo: Rcpp, RcppEigen
 Depends: R (>= 3.1)
 Suggests: survival, testthat
-RoxygenNote: 6.1.1
+Encoding: UTF-8
+RoxygenNote: 7.0.2
 URL: https://github.com/imbs-hl/ranger
 BugReports: https://github.com/imbs-hl/ranger/issues
 NeedsCompilation: yes
-Packaged: 2019-03-07 12:01:18 UTC; wright
+Packaged: 2020-01-08 08:13:53 UTC; wright
 Repository: CRAN
-Date/Publication: 2019-03-07 14:10:20 UTC
+Date/Publication: 2020-01-09 18:30:03 UTC
