@@ -42,7 +42,8 @@ ranger(
   status.variable.name = NULL,
   classification = NULL,
   x = NULL,
-  y = NULL
+  y = NULL,
+  ...
 )
 }
 \arguments{
@@ -121,6 +122,8 @@ ranger(
 \item{x}{Predictor data (independent variables), alternative interface to data with formula or dependent.variable.name.}
 
 \item{y}{Response vector (dependent variable), alternative interface to data with formula or dependent.variable.name. For survival use a \code{Surv()} object or a matrix with time and status.}
+
+\item{...}{Further arguments passed to or from other methods (currently ignored).}
 }
 \value{
 Object of class \code{ranger} with elements
@@ -167,8 +170,7 @@ For details see Malley et al. (2012).
 Note that for classification and regression nodes with size smaller than \code{min.node.size} can occur, as in original Random Forests.
 For survival all nodes contain at \code{min.node.size} samples. 
 Variables selected with \code{always.split.variables} are tried additionally to the mtry variables randomly selected.
-In \code{split.select.weights} variables weighted with 0 are never selected and variables with 1 are always selected. 
-Weights do not need to sum up to 1, they will be normalized later. 
+In \code{split.select.weights}, weights do not need to sum up to 1, they will be normalized later. 
 The weights are assigned to the variables in the order they appear in the formula or in the data if no formula is used.
 Names of the \code{split.select.weights} vector are ignored.
 The usage of \code{split.select.weights} can increase the computation times for large forests.
@@ -248,19 +250,19 @@ ranger(trait ~ ., data = dat.gwaa)
 }
 \references{
 \itemize{
-  \item Wright, M. N. & Ziegler, A. (2017). ranger: A fast implementation of random forests for high dimensional data in C++ and R. J Stat Softw 77:1-17. \url{https://doi.org/10.18637/jss.v077.i01}.
-  \item Schmid, M., Wright, M. N. & Ziegler, A. (2016). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Syst Appl 63:450-459. \url{https://doi.org/10.1016/j.eswa.2016.07.018}. 
-  \item Wright, M. N., Dankowski, T. & Ziegler, A. (2017). Unbiased split variable selection for random survival forests using maximally selected rank statistics. Stat Med 36:1272-1284. \url{https://doi.org/10.1002/sim.7212}.
-  \item Nembrini, S., Koenig, I. R. & Wright, M. N. (2018). The revival of the Gini Importance? Bioinformatics. \url{https://doi.org/10.1093/bioinformatics/bty373}.
-  \item Breiman, L. (2001). Random forests. Mach Learn, 45:5-32. \url{https://doi.org/10.1023/A:1010933404324}. 
-  \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat 2:841-860. \url{https://doi.org/10.1097/JTO.0b013e318233d835}. 
-  \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med 51:74-81. \url{https://doi.org/10.3414/ME00-01-0052}.
+  \item Wright, M. N. & Ziegler, A. (2017). ranger: A fast implementation of random forests for high dimensional data in C++ and R. J Stat Softw 77:1-17. \doi{10.18637/jss.v077.i01}.
+  \item Schmid, M., Wright, M. N. & Ziegler, A. (2016). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Syst Appl 63:450-459. \doi{10.1016/j.eswa.2016.07.018}. 
+  \item Wright, M. N., Dankowski, T. & Ziegler, A. (2017). Unbiased split variable selection for random survival forests using maximally selected rank statistics. Stat Med 36:1272-1284. \doi{10.1002/sim.7212}.
+  \item Nembrini, S., Koenig, I. R. & Wright, M. N. (2018). The revival of the Gini Importance? Bioinformatics. \doi{10.1093/bioinformatics/bty373}.
+  \item Breiman, L. (2001). Random forests. Mach Learn, 45:5-32. \doi{10.1023/A:1010933404324}. 
+  \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat 2:841-860. \doi{10.1097/JTO.0b013e318233d835}. 
+  \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med 51:74-81. \doi{10.3414/ME00-01-0052}.
   \item Hastie, T., Tibshirani, R., Friedman, J. (2009). The Elements of Statistical Learning. Springer, New York. 2nd edition.
-  \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \url{https://doi.org/10.1007/s10994-006-6226-1}.
-  \item Meinshausen (2006). Quantile Regression Forests. J Mach Learn Res 7:983-999. \url{http://www.jmlr.org/papers/v7/meinshausen06a.html}.  
-  \item Sandri, M. & Zuccolotto, P. (2008). A bias correction algorithm for the Gini variable importance measure in classification trees. J Comput Graph Stat, 17:611-628. \url{https://doi.org/10.1198/106186008X344522}.
-  \item Coppersmith D., Hong S. J., Hosking J. R. (1999). Partitioning nominal attributes in decision trees. Data Min Knowl Discov 3:197-217. \url{https://doi.org/10.1023/A:1009869804967}.
-  \item Deng & Runger (2012). Feature selection via regularized trees. The 2012 International Joint Conference on Neural Networks (IJCNN), Brisbane, Australia. \url{https://doi.org/10.1109/IJCNN.2012.6252640}.
+  \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \doi{10.1007/s10994-006-6226-1}.
+  \item Meinshausen (2006). Quantile Regression Forests. J Mach Learn Res 7:983-999. \url{https://www.jmlr.org/papers/v7/meinshausen06a.html}.  
+  \item Sandri, M. & Zuccolotto, P. (2008). A bias correction algorithm for the Gini variable importance measure in classification trees. J Comput Graph Stat, 17:611-628. \doi{10.1198/106186008X344522}.
+  \item Coppersmith D., Hong S. J., Hosking J. R. (1999). Partitioning nominal attributes in decision trees. Data Min Knowl Discov 3:197-217. \doi{10.1023/A:1009869804967}.
+  \item Deng & Runger (2012). Feature selection via regularized trees. The 2012 International Joint Conference on Neural Networks (IJCNN), Brisbane, Australia. \doi{10.1109/IJCNN.2012.6252640}.
   }
 }
 \seealso{

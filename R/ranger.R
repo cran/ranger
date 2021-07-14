@@ -47,8 +47,7 @@
 ##' Note that for classification and regression nodes with size smaller than \code{min.node.size} can occur, as in original Random Forests.
 ##' For survival all nodes contain at \code{min.node.size} samples. 
 ##' Variables selected with \code{always.split.variables} are tried additionally to the mtry variables randomly selected.
-##' In \code{split.select.weights} variables weighted with 0 are never selected and variables with 1 are always selected. 
-##' Weights do not need to sum up to 1, they will be normalized later. 
+##' In \code{split.select.weights}, weights do not need to sum up to 1, they will be normalized later. 
 ##' The weights are assigned to the variables in the order they appear in the formula or in the data if no formula is used.
 ##' Names of the \code{split.select.weights} vector are ignored.
 ##' The usage of \code{split.select.weights} can increase the computation times for large forests.
@@ -124,6 +123,7 @@
 ##' @param classification Set to \code{TRUE} to grow a classification forest. Only needed if the data is a matrix or the response numeric. 
 ##' @param x Predictor data (independent variables), alternative interface to data with formula or dependent.variable.name.
 ##' @param y Response vector (dependent variable), alternative interface to data with formula or dependent.variable.name. For survival use a \code{Surv()} object or a matrix with time and status.
+##' @param ... Further arguments passed to or from other methods (currently ignored).
 ##' @return Object of class \code{ranger} with elements
 ##'   \item{\code{forest}}{Saved forest (If write.forest set to TRUE). Note that the variable IDs in the \code{split.varIDs} object do not necessarily represent the column number in R.}
 ##'   \item{\code{predictions}}{Predicted classes/values, based on out of bag samples (classification and regression only).}
@@ -187,19 +187,19 @@
 ##' @author Marvin N. Wright
 ##' @references
 ##' \itemize{
-##'   \item Wright, M. N. & Ziegler, A. (2017). ranger: A fast implementation of random forests for high dimensional data in C++ and R. J Stat Softw 77:1-17. \url{https://doi.org/10.18637/jss.v077.i01}.
-##'   \item Schmid, M., Wright, M. N. & Ziegler, A. (2016). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Syst Appl 63:450-459. \url{https://doi.org/10.1016/j.eswa.2016.07.018}. 
-##'   \item Wright, M. N., Dankowski, T. & Ziegler, A. (2017). Unbiased split variable selection for random survival forests using maximally selected rank statistics. Stat Med 36:1272-1284. \url{https://doi.org/10.1002/sim.7212}.
-##'   \item Nembrini, S., Koenig, I. R. & Wright, M. N. (2018). The revival of the Gini Importance? Bioinformatics. \url{https://doi.org/10.1093/bioinformatics/bty373}.
-##'   \item Breiman, L. (2001). Random forests. Mach Learn, 45:5-32. \url{https://doi.org/10.1023/A:1010933404324}. 
-##'   \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat 2:841-860. \url{https://doi.org/10.1097/JTO.0b013e318233d835}. 
-##'   \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med 51:74-81. \url{https://doi.org/10.3414/ME00-01-0052}.
+##'   \item Wright, M. N. & Ziegler, A. (2017). ranger: A fast implementation of random forests for high dimensional data in C++ and R. J Stat Softw 77:1-17. \doi{10.18637/jss.v077.i01}.
+##'   \item Schmid, M., Wright, M. N. & Ziegler, A. (2016). On the use of Harrell's C for clinical risk prediction via random survival forests. Expert Syst Appl 63:450-459. \doi{10.1016/j.eswa.2016.07.018}. 
+##'   \item Wright, M. N., Dankowski, T. & Ziegler, A. (2017). Unbiased split variable selection for random survival forests using maximally selected rank statistics. Stat Med 36:1272-1284. \doi{10.1002/sim.7212}.
+##'   \item Nembrini, S., Koenig, I. R. & Wright, M. N. (2018). The revival of the Gini Importance? Bioinformatics. \doi{10.1093/bioinformatics/bty373}.
+##'   \item Breiman, L. (2001). Random forests. Mach Learn, 45:5-32. \doi{10.1023/A:1010933404324}. 
+##'   \item Ishwaran, H., Kogalur, U. B., Blackstone, E. H., & Lauer, M. S. (2008). Random survival forests. Ann Appl Stat 2:841-860. \doi{10.1097/JTO.0b013e318233d835}. 
+##'   \item Malley, J. D., Kruppa, J., Dasgupta, A., Malley, K. G., & Ziegler, A. (2012). Probability machines: consistent probability estimation using nonparametric learning machines. Methods Inf Med 51:74-81. \doi{10.3414/ME00-01-0052}.
 ##'   \item Hastie, T., Tibshirani, R., Friedman, J. (2009). The Elements of Statistical Learning. Springer, New York. 2nd edition.
-##'   \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \url{https://doi.org/10.1007/s10994-006-6226-1}.
-##'   \item Meinshausen (2006). Quantile Regression Forests. J Mach Learn Res 7:983-999. \url{http://www.jmlr.org/papers/v7/meinshausen06a.html}.  
-##'   \item Sandri, M. & Zuccolotto, P. (2008). A bias correction algorithm for the Gini variable importance measure in classification trees. J Comput Graph Stat, 17:611-628. \url{https://doi.org/10.1198/106186008X344522}.
-##'   \item Coppersmith D., Hong S. J., Hosking J. R. (1999). Partitioning nominal attributes in decision trees. Data Min Knowl Discov 3:197-217. \url{https://doi.org/10.1023/A:1009869804967}.
-##'   \item Deng & Runger (2012). Feature selection via regularized trees. The 2012 International Joint Conference on Neural Networks (IJCNN), Brisbane, Australia. \url{https://doi.org/10.1109/IJCNN.2012.6252640}.
+##'   \item Geurts, P., Ernst, D., Wehenkel, L. (2006). Extremely randomized trees. Mach Learn 63:3-42. \doi{10.1007/s10994-006-6226-1}.
+##'   \item Meinshausen (2006). Quantile Regression Forests. J Mach Learn Res 7:983-999. \url{https://www.jmlr.org/papers/v7/meinshausen06a.html}.  
+##'   \item Sandri, M. & Zuccolotto, P. (2008). A bias correction algorithm for the Gini variable importance measure in classification trees. J Comput Graph Stat, 17:611-628. \doi{10.1198/106186008X344522}.
+##'   \item Coppersmith D., Hong S. J., Hosking J. R. (1999). Partitioning nominal attributes in decision trees. Data Min Knowl Discov 3:197-217. \doi{10.1023/A:1009869804967}.
+##'   \item Deng & Runger (2012). Feature selection via regularized trees. The 2012 International Joint Conference on Neural Networks (IJCNN), Brisbane, Australia. \doi{10.1109/IJCNN.2012.6252640}.
 ##'   }
 ##' @seealso \code{\link{predict.ranger}}
 ##' @useDynLib ranger, .registration = TRUE
@@ -224,7 +224,12 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                    num.threads = NULL, save.memory = FALSE,
                    verbose = TRUE, seed = NULL, 
                    dependent.variable.name = NULL, status.variable.name = NULL, 
-                   classification = NULL, x = NULL, y = NULL) {
+                   classification = NULL, x = NULL, y = NULL, ...) {
+  
+  ## Handle ... arguments
+  if (length(list(...)) > 0) {
+    warning(paste("Unused arguments:", paste(names(list(...)), collapse = ", ")))
+  }
   
   ## By default not in GWAS mode
   snp.data <- as.matrix(0)
@@ -366,6 +371,11 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
         num.y <- as.numeric(y)
       } else {
         num.y <- y
+      }
+      
+      ## Save non-recoded x if quantile regression
+      if (quantreg) {
+        x_orig <- x
       }
 
       ## Recode each column
@@ -516,6 +526,8 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     if (!is.null(case.weights)) {
       stop("Error: Combination of case.weights and class-wise sampling not supported.")
     }
+    # Fix order (C++ needs sample.fraction in order as classes appear in data)
+    sample.fraction <- sample.fraction[as.numeric(unique(y))]
   } else {
     if (sample.fraction <= 0 || sample.fraction > 1) {
       stop("Error: Invalid value for sample.fraction. Please give a value in (0,1] or a vector of values in [0,1].")
@@ -958,7 +970,12 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   
   ## Prepare quantile prediction
   if (quantreg) {
-    terminal.nodes <- predict(result, x, type = "terminalNodes")$predictions + 1
+    if (respect.unordered.factors == "order" && !is.null(x_orig)) {
+      terminal.nodes <- predict(result, x_orig, type = "terminalNodes")$predictions + 1
+    } else {
+      terminal.nodes <- predict(result, x, type = "terminalNodes")$predictions + 1
+    }
+  
     n <- result$num.samples
     result$random.node.values <- matrix(nrow = max(terminal.nodes), ncol = num.trees)
     
@@ -971,24 +988,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     ## Prepare out-of-bag quantile regression
     if(!is.null(result$inbag.counts)) {
       inbag.counts <- simplify2array(result$inbag.counts)
-      random.node.values.oob <- 0 * terminal.nodes
-      random.node.values.oob[inbag.counts > 0] <- NA
-      
-      ## For each tree and observation select one random obs in the same node (not the same obs)
-      for (tree in 1:num.trees){
-        is.oob <- inbag.counts[, tree] == 0
-        num.oob <- sum(is.oob)
-        
-        if (num.oob != 0) {
-          oob.obs <- which(is.oob)
-          oob.nodes <- terminal.nodes[oob.obs, tree]
-          for (j in 1:num.oob) {
-            idx <- terminal.nodes[, tree] == oob.nodes[j]
-            idx[oob.obs[j]] <- FALSE
-            random.node.values.oob[oob.obs[j], tree] <- save.sample(y[idx], size = 1)
-          }
-        }
-      }
+      random.node.values.oob <- randomObsNode(terminal.nodes, y, inbag.counts)
       
       ## Check num.trees
       minoob <- min(rowSums(inbag.counts == 0))
