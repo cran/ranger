@@ -13,6 +13,7 @@ ranger(
   write.forest = TRUE,
   probability = FALSE,
   min.node.size = NULL,
+  min.bucket = NULL,
   max.depth = NULL,
   replace = TRUE,
   sample.fraction = ifelse(replace, 1, 0.632),
@@ -61,7 +62,9 @@ ranger(
 
 \item{probability}{Grow a probability forest as in Malley et al. (2012).}
 
-\item{min.node.size}{Minimal node size. Default 1 for classification, 5 for regression, 3 for survival, and 10 for probability.}
+\item{min.node.size}{Minimal node size to split at. Default 1 for classification, 5 for regression, 3 for survival, and 10 for probability.}
+
+\item{min.bucket}{Minimal terminal node size. No nodes smaller than this value can occur. Default 3 for survival and 1 for all other tree types.}
 
 \item{max.depth}{Maximal tree depth. A value of NULL or 0 (the default) corresponds to unlimited depth, 1 to tree stumps (1 split per tree).}
 
@@ -167,8 +170,8 @@ Predictions are class probabilities for each sample.
 In contrast to other implementations, each tree returns a probability estimate and these estimates are averaged for the forest probability estimate.
 For details see Malley et al. (2012).
 
-Note that for classification and regression nodes with size smaller than \code{min.node.size} can occur, as in original Random Forests.
-For survival all nodes contain at \code{min.node.size} samples. 
+Note that nodes with size smaller than \code{min.node.size} can occur because \code{min.node.size} is the minimal node size \emph{to split at}, as in original Random Forests.
+To restrict the size of terminal nodes, set \code{min.bucket}. 
 Variables selected with \code{always.split.variables} are tried additionally to the mtry variables randomly selected.
 In \code{split.select.weights}, weights do not need to sum up to 1, they will be normalized later. 
 The weights are assigned to the variables in the order they appear in the formula or in the data if no formula is used.
@@ -184,9 +187,9 @@ The use of 'order' is recommended, as it computationally fast and can handle an 
 Note that the factors are only reordered once and not again in each split. 
 
 The 'impurity_corrected' importance measure is unbiased in terms of the number of categories and category frequencies and is almost as fast as the standard impurity importance.
-It is a modified version of the method by Sandri & Zuccolotto (2008), which is faster and more memory efficient. 
-See Nembrini et al. (2018) for details.
-This importance measure can be combined with the methods to estimate p-values in \code{\link{importance_pvalues}}.
+It is a modified version of the method by Sandri & Zuccolotto (2008), which is faster and more memory efficient. See Nembrini et al. (2018) for details.
+This importance measure can be combined with the methods to estimate p-values in \code{\link{importance_pvalues}}. 
+We recommend not to use the 'impurity_corrected' importance when making predictions since the feature permutation step might reduce predictive performance (a warning is raised when predicting on new data). 
 
 Regularization works by penalizing new variables by multiplying the splitting criterion by a factor, see Deng & Runger (2012) for details.  
 If \code{regularization.usedepth=TRUE}, \eqn{f^d} is used, where \emph{f} is the regularization factor and \emph{d} the depth of the node.

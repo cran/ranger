@@ -50,7 +50,7 @@ using namespace ranger;
 // [[Rcpp::export]]
 Rcpp::List rangerCpp(uint treetype, Rcpp::NumericMatrix& input_x, Rcpp::NumericMatrix& input_y,
     std::vector<std::string> variable_names, uint mtry, uint num_trees, bool verbose, uint seed, uint num_threads,
-    bool write_forest, uint importance_mode_r, uint min_node_size,
+    bool write_forest, uint importance_mode_r, uint min_node_size, uint min_bucket,
     std::vector<std::vector<double>>& split_select_weights, bool use_split_select_weights,
     std::vector<std::string>& always_split_variable_names, bool use_always_split_variable_names,
     bool prediction_mode, Rcpp::List loaded_forest, Rcpp::RawMatrix snp_data,
@@ -108,9 +108,9 @@ Rcpp::List rangerCpp(uint treetype, Rcpp::NumericMatrix& input_x, Rcpp::NumericM
 
     // Initialize data 
     if (use_sparse_data) {
-      data = make_unique<DataSparse>(sparse_x, input_y, variable_names, num_rows, num_cols);
+      data = std::make_unique<DataSparse>(sparse_x, input_y, variable_names, num_rows, num_cols);
     } else {
-      data = make_unique<DataRcpp>(input_x, input_y, variable_names, num_rows, num_cols);
+      data = std::make_unique<DataRcpp>(input_x, input_y, variable_names, num_rows, num_cols);
     }
 
     // If there is snp data, add it
@@ -127,19 +127,19 @@ Rcpp::List rangerCpp(uint treetype, Rcpp::NumericMatrix& input_x, Rcpp::NumericM
     switch (treetype) {
     case TREE_CLASSIFICATION:
       if (probability) {
-        forest = make_unique<ForestProbability>();
+        forest = std::make_unique<ForestProbability>();
       } else {
-        forest = make_unique<ForestClassification>();
+        forest = std::make_unique<ForestClassification>();
       }
       break;
     case TREE_REGRESSION:
-      forest = make_unique<ForestRegression>();
+      forest = std::make_unique<ForestRegression>();
       break;
     case TREE_SURVIVAL:
-      forest = make_unique<ForestSurvival>();
+      forest = std::make_unique<ForestSurvival>();
       break;
     case TREE_PROBABILITY:
-      forest = make_unique<ForestProbability>();
+      forest = std::make_unique<ForestProbability>();
       break;
     }
 
@@ -149,7 +149,7 @@ Rcpp::List rangerCpp(uint treetype, Rcpp::NumericMatrix& input_x, Rcpp::NumericM
 
     // Init Ranger
     forest->initR(std::move(data), mtry, num_trees, verbose_out, seed, num_threads,
-        importance_mode, min_node_size, split_select_weights, always_split_variable_names,
+        importance_mode, min_node_size, min_bucket, split_select_weights, always_split_variable_names,
         prediction_mode, sample_with_replacement, unordered_variable_names, save_memory, splitrule, case_weights,
         inbag, predict_all, keep_inbag, sample_fraction, alpha, minprop, holdout, prediction_type, num_random_splits, 
         order_snps, max_depth, regularization_factor, regularization_usedepth);

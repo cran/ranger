@@ -17,12 +17,10 @@
 #include <random>
 #include <ctime>
 #include <memory>
-#ifndef OLD_WIN_R_BUILD
 #include <thread>
 #include <chrono>
 #include <mutex>
 #include <condition_variable>
-#endif
 
 #include "globals.h"
 #include "Tree.h"
@@ -42,7 +40,7 @@ public:
   // Init from c++ main or Rcpp from R
   void initCpp(std::string dependent_variable_name, MemoryMode memory_mode, std::string input_file, uint mtry,
       std::string output_prefix, uint num_trees, std::ostream* verbose_out, uint seed, uint num_threads,
-      std::string load_forest_filename, ImportanceMode importance_mode, uint min_node_size,
+      std::string load_forest_filename, ImportanceMode importance_mode, uint min_node_size, uint min_bucket,
       std::string split_select_weights_file, const std::vector<std::string>& always_split_variable_names,
       std::string status_variable_name, bool sample_with_replacement,
       const std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
@@ -50,7 +48,7 @@ public:
       bool holdout, PredictionType prediction_type, uint num_random_splits, uint max_depth,
       const std::vector<double>& regularization_factor, bool regularization_usedepth);
   void initR(std::unique_ptr<Data> input_data, uint mtry, uint num_trees, std::ostream* verbose_out, uint seed,
-      uint num_threads, ImportanceMode importance_mode, uint min_node_size,
+      uint num_threads, ImportanceMode importance_mode, uint min_node_size, uint min_bucket,
       std::vector<std::vector<double>>& split_select_weights,
       const std::vector<std::string>& always_split_variable_names, bool prediction_mode, bool sample_with_replacement,
       const std::vector<std::string>& unordered_variable_names, bool memory_saving_splitting, SplitRule splitrule,
@@ -59,7 +57,7 @@ public:
       PredictionType prediction_type, uint num_random_splits, bool order_snps, uint max_depth,
       const std::vector<double>& regularization_factor, bool regularization_usedepth);
   void init(std::unique_ptr<Data> input_data, uint mtry, std::string output_prefix,
-      uint num_trees, uint seed, uint num_threads, ImportanceMode importance_mode, uint min_node_size,
+      uint num_trees, uint seed, uint num_threads, ImportanceMode importance_mode, uint min_node_size, uint min_bucket,
       bool prediction_mode, bool sample_with_replacement, const std::vector<std::string>& unordered_variable_names,
       bool memory_saving_splitting, SplitRule splitrule, bool predict_all, std::vector<double>& sample_fraction,
       double alpha, double minprop, bool holdout, PredictionType prediction_type, uint num_random_splits,
@@ -122,6 +120,9 @@ public:
   uint getMinNodeSize() const {
     return min_node_size;
   }
+  uint getMinBucket() const {
+    return min_bucket;
+  }
   size_t getNumIndependentVariables() const {
     return num_independent_variables;
   }
@@ -176,11 +177,7 @@ protected:
   void setAlwaysSplitVariables(const std::vector<std::string>& always_split_variable_names);
 
   // Show progress every few seconds
-#ifdef OLD_WIN_R_BUILD
-  void showProgress(std::string operation, clock_t start_time, clock_t& lap_time);
-#else
   void showProgress(std::string operation, size_t max_progress);
-#endif
 
   // Verbose output stream, cout if verbose==true, logfile if not
   std::ostream* verbose_out;
@@ -189,6 +186,7 @@ protected:
   size_t num_trees;
   uint mtry;
   uint min_node_size;
+  uint min_bucket;
   size_t num_independent_variables;
   uint seed;
   size_t num_samples;
@@ -212,10 +210,8 @@ protected:
   // Multithreading
   uint num_threads;
   std::vector<uint> thread_ranges;
-#ifndef OLD_WIN_R_BUILD
   std::mutex mutex;
   std::condition_variable condition_variable;
-#endif
 
   std::vector<std::unique_ptr<Tree>> trees;
   std::unique_ptr<Data> data;
