@@ -250,6 +250,9 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   regularization.factor <- c(0, 0)
   use.regularization.factor <- FALSE
   regularization.usedepth <- FALSE
+  node.stats <- FALSE
+  time.interest <- c(0, 0)
+  use.time.interest <- FALSE
   
   ## Use sparse matrix
   if (inherits(x, "dgCMatrix")) {
@@ -273,7 +276,8 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
                       predict.all, keep.inbag, sample.fraction, alpha, minprop, holdout, 
                       prediction.type, num.random.splits, sparse.x, use.sparse.data,
                       order.snps, oob.error, max.depth, inbag, use.inbag, 
-                      regularization.factor, use.regularization.factor, regularization.usedepth)
+                      regularization.factor, use.regularization.factor, regularization.usedepth, 
+                      node.stats, time.interest, use.time.interest)
 
   if (length(result) == 0) {
     stop("User interrupt or internal error.")
@@ -516,7 +520,7 @@ predict.ranger <- function(object, data = NULL, predict.all = FALSE,
       node.values <- object$random.node.values.oob
     } else {
       ## New data prediction
-      terminal.nodes <- predict(object, data, type = "terminalNodes")$predictions + 1
+      terminal.nodes <- predict(object, data, num.threads = num.threads, type = "terminalNodes")$predictions + 1
       node.values <- 0 * terminal.nodes
       for (tree in 1:num.trees) {
         node.values[, tree] <- object$random.node.values[terminal.nodes[, tree], tree]
