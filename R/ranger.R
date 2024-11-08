@@ -85,6 +85,10 @@
 ##' If \code{regularization.usedepth=TRUE}, \eqn{f^d} is used, where \emph{f} is the regularization factor and \emph{d} the depth of the node.
 ##' If regularization is used, multithreading is deactivated because all trees need access to the list of variables that are already included in the model.
 ##'
+##' Missing values can be internally handled by setting \code{na.action = "na.learn"} (default), by omitting observations with missing values with \code{na.action = "na.omit"} or by stopping if missing values are found with \code{na.action = "na.fail"}.
+##' With \code{na.action = "na.learn"}, missing values are ignored for calculating an initial split criterion value (i.e., decrease of impurity). Then for the best split, all missings are tried in both child nodes and the choice is made based again on the split criterion value. 
+##' For prediction, this direction is saved as the "default" direction. If a missing occurs in prediction at a node where there is no default direction, it goes left.
+##'
 ##' For a large number of variables and data frames as input data the formula interface can be slow or impossible to use.
 ##' Alternatively \code{dependent.variable.name} (and \code{status.variable.name} for survival) or \code{x} and \code{y} can be used.
 ##' Use \code{x} and \code{y} with a matrix for \code{x} to avoid conversions and save memory.
@@ -96,10 +100,10 @@
 ##' To use only the SNPs without sex or other covariates from the phenotype file, use \code{0} on the right hand side of the formula. 
 ##' Note that missing values are treated as an extra category while splitting.
 ##' 
-##' See \url{https://github.com/imbs-hl/ranger} for the development version.
+##' By default, ranger uses 2 threads. The default can be changed with: (1) \code{num.threads} in ranger/predict call, (2) environment variable
+##' R_RANGER_NUM_THREADS, (3) \code{options(ranger.num.threads = N)}, (4) \code{options(Ncpus = N)}, with precedence in that order.
 ##' 
-##' With recent R versions, multithreading on Windows platforms should just work. 
-##' If you compile yourself, the new RTools toolchain is required.
+##' See \url{https://github.com/imbs-hl/ranger} for the development version.
 ##' 
 ##' @title Ranger
 ##' @param formula Object of class \code{formula} or \code{character} describing the model to fit. Interaction terms supported only for numerical variables.
@@ -109,17 +113,21 @@
 ##' @param importance Variable importance mode, one of 'none', 'impurity', 'impurity_corrected', 'permutation'. The 'impurity' measure is the Gini index for classification, the variance of the responses for regression and the sum of test statistics (see \code{splitrule}) for survival. 
 ##' @param write.forest Save \code{ranger.forest} object, required for prediction. Set to \code{FALSE} to reduce memory usage if no prediction intended.
 ##' @param probability Grow a probability forest as in Malley et al. (2012). 
-##' @param min.node.size Minimal node size to split at. Default 1 for classification, 5 for regression, 3 for survival, and 10 for probability.
-##' @param min.bucket Minimal terminal node size. No nodes smaller than this value can occur. Default 3 for survival and 1 for all other tree types. 
+##' @param min.node.size Minimal node size to split at. Default 1 for classification, 5 for regression, 3 for survival, and 10 for probability. For classification, this can be a vector of class-specific values. 
+##' @param min.bucket Minimal terminal node size. No nodes smaller than this value can occur. Default 3 for survival and 1 for all other tree types. For classification, this can be a vector of class-specific values. 
 ##' @param max.depth Maximal tree depth. A value of NULL or 0 (the default) corresponds to unlimited depth, 1 to tree stumps (1 split per tree).
 ##' @param replace Sample with replacement. 
 ##' @param sample.fraction Fraction of observations to sample. Default is 1 for sampling with replacement and 0.632 for sampling without replacement. For classification, this can be a vector of class-specific values. 
 ##' @param case.weights Weights for sampling of training observations. Observations with larger weights will be selected with higher probability in the bootstrap (or subsampled) samples for the trees.
 ##' @param class.weights Weights for the outcome classes (in order of the factor levels) in the splitting rule (cost sensitive learning). Classification and probability prediction only. For classification the weights are also applied in the majority vote in terminal nodes.
-##' @param splitrule Splitting rule. For classification and probability estimation "gini", "extratrees" or "hellinger" with default "gini". For regression "variance", "extratrees", "maxstat" or "beta" with default "variance". For survival "logrank", "extratrees", "C" or "maxstat" with default "logrank". 
+##' @param splitrule Splitting rule. For classification and probability estimation "gini", "extratrees" or "hellinger" with default "gini".
+##'   For regression "variance", "extratrees", "maxstat", "beta" or "poisson" with default "variance".
+##'   For survival "logrank", "extratrees", "C" or "maxstat" with default "logrank". 
 ##' @param num.random.splits For "extratrees" splitrule.: Number of random splits to consider for each candidate splitting variable.
 ##' @param alpha For "maxstat" splitrule: Significance threshold to allow splitting.
 ##' @param minprop For "maxstat" splitrule: Lower quantile of covariate distribution to be considered for splitting.
+##' @param poisson.tau For "poisson" splitrule: The coefficient of variation of the (expected) frequency is \eqn{1/\tau}.
+##'   If a terminal node has only 0 responses, the estimate is set to \eqn{\alpha 0 + (1-\alpha) mean(parent)} with \eqn{\alpha = samples(child) mean(parent) / (\tau + samples(child) mean(parent))}.
 ##' @param split.select.weights Numeric vector with weights between 0 and 1, used to calculate the probability to select variables for splitting. Alternatively, a list of size num.trees, containing split select weight vectors for each tree can be used.  
 ##' @param always.split.variables Character vector with variable names to be always selected in addition to the \code{mtry} variables tried for splitting.
 ##' @param respect.unordered.factors Handling of unordered factor covariates. One of 'ignore', 'order' and 'partition'. For the "extratrees" splitrule the default is "partition" for all other splitrules 'ignore'. Alternatively TRUE (='order') or FALSE (='ignore') can be used. See below for details. 
@@ -133,11 +141,12 @@
 ##' @param quantreg Prepare quantile prediction as in quantile regression forests (Meinshausen 2006). Regression only. Set \code{keep.inbag = TRUE} to prepare out-of-bag quantile prediction.
 ##' @param time.interest Time points of interest (survival only). Can be \code{NULL} (default, use all observed time points), a vector of time points or a single number to use as many time points (grid over observed time points).
 ##' @param oob.error Compute OOB prediction error. Set to \code{FALSE} to save computation time, e.g. for large survival forests.
-##' @param num.threads Number of threads. Default is number of CPUs available.
+##' @param num.threads Number of threads. Use 0 for all available cores. Default is 2 if not set by options/environment variables (see below).
 ##' @param save.memory Use memory saving (but slower) splitting mode. No effect for survival and GWAS data. Warning: This option slows down the tree growing, use only if you encounter memory problems.
 ##' @param verbose Show computation status and estimated runtime.
 ##' @param node.stats Save node statistics. Set to \code{TRUE} to save prediction, number of observations and split statistics for each node.
 ##' @param seed Random seed. Default is \code{NULL}, which generates the seed from \code{R}. Set to \code{0} to ignore the \code{R} seed. 
+##' @param na.action Handling of missing values. Set to "na.learn" to internally handle missing values (default, see below), to "na.omit" to omit observations with missing values and to "na.fail" to stop if missing values are found.
 ##' @param dependent.variable.name Name of dependent variable, needed if no formula given. For survival forests this is the time variable.
 ##' @param status.variable.name Name of status variable, only applicable to survival data and needed if no formula given. Use 1 for event and 0 for censoring.
 ##' @param classification Set to \code{TRUE} to grow a classification forest. Only needed if the data is a matrix or the response numeric. 
@@ -237,6 +246,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                    replace = TRUE, sample.fraction = ifelse(replace, 1, 0.632), 
                    case.weights = NULL, class.weights = NULL, splitrule = NULL, 
                    num.random.splits = 1, alpha = 0.5, minprop = 0.1,
+                   poisson.tau = 1,
                    split.select.weights = NULL, always.split.variables = NULL,
                    respect.unordered.factors = NULL,
                    scale.permutation.importance = FALSE,
@@ -245,7 +255,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                    keep.inbag = FALSE, inbag = NULL, holdout = FALSE,
                    quantreg = FALSE, time.interest = NULL, oob.error = TRUE,
                    num.threads = NULL, save.memory = FALSE,
-                   verbose = TRUE, node.stats = FALSE, seed = NULL, 
+                   verbose = TRUE, node.stats = FALSE, seed = NULL, na.action = "na.learn",
                    dependent.variable.name = NULL, status.variable.name = NULL, 
                    classification = NULL, x = NULL, y = NULL, ...) {
   
@@ -320,13 +330,37 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   }
   
   ## Check missing values
-  if (any(is.na(x))) {
-    offending_columns <- colnames(x)[colSums(is.na(x)) > 0]
-    stop("Missing data in columns: ",
-         paste0(offending_columns, collapse = ", "), ".", call. = FALSE)
-  }
-  if (any(is.na(y))) {
-    stop("Missing data in dependent variable.", call. = FALSE)
+  any.na <- FALSE
+  if (na.action == "na.fail") {
+    if (anyNA(x)) {
+      offending_columns <- colnames(x)[colSums(is.na(x)) > 0]
+      stop("Error: Missing data in columns: ",
+           paste0(offending_columns, collapse = ", "), ".", call. = FALSE)
+    }
+    if (anyNA(y)) {
+      stop("Error: Missing data in dependent variable.", call. = FALSE)
+    }
+  } else if (na.action == "na.omit") {
+    if (anyNA(x)) {
+      idx_keep <- stats::complete.cases(x)  
+      x <- x[idx_keep, , drop = FALSE]
+      y <- y[idx_keep, drop = FALSE]
+      if (nrow(x) < 1) {
+        stop("Error: No observations left after removing missing values.")
+      }
+    }
+  } else if (na.action == "na.learn") {
+    if (anyNA(y)) {
+      stop("Error: Missing data in dependent variable.", call. = FALSE)
+    }
+    if (anyNA(x)) {
+      any.na <- TRUE
+      if (!is.null(splitrule) && !(splitrule %in% c("gini", "variance"))) {
+        stop("Error: Missing value handling currently only implemented for gini and variance splitrules.")
+      }
+    }
+  } else {
+    stop("Error: Invalid value for na.action. Use 'na.learn', 'na.omit' or 'na.fail'.")
   }
   
   ## Check response levels
@@ -357,6 +391,20 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     treetype <- 5
   } else {
     stop("Error: Unsupported type of dependent variable.")
+  }
+  
+  ## No missing value handling for survival yet
+  if (any.na & treetype == 5) {
+    stop("Error: Missing value handling not yet implemented for survival forests.")
+  }
+  
+  ## Number of levels
+  if (treetype %in% c(1, 9)) {
+    if (is.factor(y)) {
+      num_levels <- nlevels(y)
+    } else {
+      num_levels <- length(unique(y))
+    }
   }
   
   ## Quantile prediction only for regression
@@ -430,7 +478,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
         } else {
           ## Order factor levels by mean response
           means <- sapply(levels(xx), function(y) {
-            mean(num.y[xx == y])
+            mean(num.y[xx == y], na.rm = TRUE)
           })
           levels.ordered <- as.character(levels(xx)[order(means)])
         }
@@ -514,7 +562,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   ## Num threads
   ## Default 0 -> detect from system in C++.
   if (is.null(num.threads)) {
-    num.threads = 0
+    num.threads <- as.integer(Sys.getenv("R_RANGER_NUM_THREADS", getOption("ranger.num.threads", getOption("Ncpus", 2L))))
   } else if (!is.numeric(num.threads) || num.threads < 0) {
     stop("Error: Invalid value for num.threads")
   }
@@ -522,15 +570,45 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   ## Minimum node size
   if (is.null(min.node.size)) {
     min.node.size <- 0
-  } else if (!is.numeric(min.node.size) || min.node.size < 0) {
-    stop("Error: Invalid value for min.node.size")
+  } else if (!is.numeric(min.node.size)) {
+    stop("Error: Invalid value for min.node.size.")
+  }
+  if (length(min.node.size) > 1) {
+    if (!(treetype %in% c(1, 9))) {
+      stop("Error: Invalid value for min.node.size. Vector values only valid for classification forests.")
+    }
+    if (any(min.node.size < 0)) {
+      stop("Error: Invalid value for min.node.size. Please give a nonnegative value or a vector of nonnegative values.")
+    }
+    if (length(min.node.size) != num_levels) {
+      stop("Error: Invalid value for min.node.size Expecting ", num_levels, " values, provided ", length(min.node.size), ".")
+    }
+  } else {
+    if (min.node.size < 0) {
+      stop("Error: Invalid value for min.node.size. Please give a nonnegative value or a vector of nonnegative values.")
+    }
   }
 
   ## Minimum bucket size
   if (is.null(min.bucket)) {
     min.bucket <- 0
-  } else if (!is.numeric(min.bucket) || min.bucket < 0) {
+  } else if (!is.numeric(min.bucket)) {
     stop("Error: Invalid value for min.bucket")
+  }
+  if (length(min.bucket) > 1) {
+    if (!(treetype %in% c(1, 9))) {
+      stop("Error: Invalid value for min.bucket Vector values only valid for classification forests.")
+    }
+    if (any(min.bucket < 0)) {
+      stop("Error: Invalid value for min.bucket Please give a nonnegative value or a vector of nonnegative values.")
+    }
+    if (length(min.bucket) != num_levels) {
+      stop("Error: Invalid value for min.bucket Expecting ", num_levels, " values, provided ", length(min.bucket), ".")
+    }
+  } else {
+    if (min.bucket < 0) {
+      stop("Error: Invalid value for min.bucket Please give a nonnegative value or a vector of nonnegative values.")
+    }
   }
   
   ## Tree depth
@@ -554,8 +632,8 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     if (sum(sample.fraction) <= 0) {
       stop("Error: Invalid value for sample.fraction. Sum of values must be >0.")
     }
-    if (length(sample.fraction) != nlevels(y)) {
-      stop("Error: Invalid value for sample.fraction. Expecting ", nlevels(y), " values, provided ", length(sample.fraction), ".")
+    if (length(sample.fraction) != num_levels) {
+      stop("Error: Invalid value for sample.fraction. Expecting ", num_levels, " values, provided ", length(sample.fraction), ".")
     }
     if (!replace & any(sample.fraction * length(y) > table(y))) {
       idx <- which(sample.fraction * length(y) > table(y))[1]
@@ -658,6 +736,9 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     }
     if (length(inbag) != num.trees) {
       stop("Error: Size of inbag list not equal to number of trees.")
+    }
+    if (any(sapply(inbag, length) != nrow(x))) {
+      stop("Error: Size of at least one element in inbag not equal to number of samples.")
     }
   } else {
     stop("Error: Invalid inbag, expects list of vectors of size num.trees.")
@@ -776,6 +857,17 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     if ((is.factor(y) && nlevels(y) > 2) || (length(unique(y)) > 2)) {
       stop("Error: Hellinger splitrule only implemented for binary classification.")
     }  
+  } else if (splitrule == "poisson") {
+    if (treetype == 3) {
+      splitrule.num <- 8
+    } else {
+      stop("Error: poisson splitrule applicable to regression data only.")
+    }
+    
+    ## Check for valid responses
+    if (min(y) < 0 || sum(y) <= 0) {
+      stop("Error: poisson splitrule applicable to regression data with non-positive outcome (y>=0 and sum(y)>0) only.")
+    }
   } else {
     stop("Error: Unknown splitrule.")
   }
@@ -800,6 +892,10 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   }
   if (num.random.splits > 1 && splitrule.num != 5) {
     warning("Argument 'num.random.splits' ignored if splitrule is not 'extratrees'.")
+  }
+  
+  if (!is.numeric(poisson.tau) || poisson.tau <= 0) {
+    stop("Error: Invalid value for poisson.tau, please give a positive number.")
   }
 
   ## Unordered factors  
@@ -837,6 +933,8 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
       stop("Error: Unordered factor splitting not implemented for 'C' splitting rule.")
     } else if (splitrule == "beta") {
       stop("Error: Unordered factor splitting not implemented for 'beta' splitting rule.")
+    } else if (splitrule == "poisson") {
+      stop("Error: Unordered factor splitting not implemented for 'poisson' splitting rule.")
     }
   }
   
@@ -924,11 +1022,12 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                       prediction.mode, loaded.forest, snp.data,
                       replace, probability, unordered.factor.variables, use.unordered.factor.variables, 
                       save.memory, splitrule.num, case.weights, use.case.weights, class.weights, 
-                      predict.all, keep.inbag, sample.fraction, alpha, minprop, holdout, prediction.type, 
-                      num.random.splits, sparse.x, use.sparse.data, order.snps, oob.error, max.depth, 
-                      inbag, use.inbag, 
-                      regularization.factor, use.regularization.factor, regularization.usedepth, 
-                      node.stats, time.interest, use.time.interest)
+                      predict.all, keep.inbag, sample.fraction, alpha, minprop, poisson.tau,
+                      holdout, prediction.type, num.random.splits, sparse.x, use.sparse.data,
+                      order.snps, oob.error, max.depth, inbag, use.inbag, 
+                      regularization.factor, use.regularization.factor, regularization.usedepth,
+                      node.stats, time.interest, use.time.interest, any.na)
+
   
   if (length(result) == 0) {
     stop("User interrupt or internal error.")
@@ -1033,6 +1132,11 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   ## will be NULL only when x/y interface is used
   result$dependent.variable.name <- dependent.variable.name
   result$status.variable.name <- status.variable.name
+  
+  ## Save max.depth
+  if (!is.null(max.depth)) {
+    result$max.depth <- max.depth
+  }
   
   class(result) <- "ranger"
   

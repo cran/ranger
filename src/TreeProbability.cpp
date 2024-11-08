@@ -89,7 +89,7 @@ bool TreeProbability::splitNodeInternal(size_t nodeID, std::vector<size_t>& poss
   }
   
   // Stop if maximum node size or depth reached
-  if (num_samples_node <= min_node_size || (nodeID >= last_left_nodeID && max_depth > 0 && depth >= max_depth)) {
+  if ((min_node_size->size() == 1 && num_samples_node <= (*min_node_size)[0]) || (nodeID >= last_left_nodeID && max_depth > 0 && depth >= max_depth)) {
     if (!save_node_stats) {
       addToTerminalNodes(nodeID);
     }
@@ -170,34 +170,64 @@ bool TreeProbability::findBestSplit(size_t nodeID, std::vector<size_t>& possible
     uint sample_classID = (*response_classIDs)[sampleID];
     ++class_counts[sample_classID];
   }
-
+  
+  // Stop if class-wise minimal node size reached
+  if (min_node_size->size() > 1) {
+    for (size_t j = 0; j < num_classes; ++j) {
+      if (class_counts[j] < (*min_node_size)[j]) {
+        return true;
+      }
+    }
+  }
+  
   // Stop early if no split posssible
-  if (num_samples_node >= 2 * min_bucket) {
+  if (min_bucket->size() == 1) {
+    if (num_samples_node < 2 * (*min_bucket)[0]) {
+      return true;
+    }
+  } else {
+    uint sum_min_bucket = 0;
+    for (size_t j = 0; j < num_classes; ++j) {
+      sum_min_bucket += (*min_bucket)[j];
+    }
+    if (num_samples_node < sum_min_bucket) {
+      return true;
+    } 
+  }
 
-    // For all possible split variables
-    for (auto& varID : possible_split_varIDs) {
-      // Find best split value, if ordered consider all values as split values, else all 2-partitions
-      if (data->isOrderedVariable(varID)) {
+  // For all possible split variables
+  for (auto& varID : possible_split_varIDs) {
+    // Find best split value, if ordered consider all values as split values, else all 2-partitions
+    if (data->isOrderedVariable(varID)) {
 
-        // Use memory saving method if option set
-        if (memory_saving_splitting) {
-          findBestSplitValueSmallQ(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
-              best_decrease);
-        } else {
-          // Use faster method for both cases
-          double q = (double) num_samples_node / (double) data->getNumUniqueDataValues(varID);
-          if (q < Q_THRESHOLD) {
+      // Use memory saving method if option set
+      if (memory_saving_splitting) {
+        findBestSplitValueSmallQ(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
+            best_decrease);
+      } else {
+        // Use faster method for both cases
+        double q = (double) num_samples_node / (double) data->getNumUniqueDataValues(varID);
+        if (q < Q_THRESHOLD) {
+          if (data->hasNA()) {
+            findBestSplitValueNanSmallQ(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
+                                     best_decrease);
+          } else {
             findBestSplitValueSmallQ(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
-                best_decrease);
+                                     best_decrease);
+          }
+        } else {
+          if (data->hasNA()) {
+            findBestSplitValueNanLargeQ(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
+                                     best_decrease);
           } else {
             findBestSplitValueLargeQ(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
-                best_decrease);
+                                     best_decrease); 
           }
         }
-      } else {
-        findBestSplitValueUnordered(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
-            best_decrease);
       }
+    } else {
+      findBestSplitValueUnordered(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
+          best_decrease);
     }
   }
 
@@ -287,7 +317,7 @@ void TreeProbability::findBestSplitValueSmallQ(size_t nodeID, size_t varID, size
     }
 
     // Stop if minimal bucket size reached
-    if (n_left < min_bucket || n_right < min_bucket) {
+    if (min_bucket->size() == 1 && (n_left < (*min_bucket)[0] || n_right < (*min_bucket)[0])) {
       continue;
     }
 
@@ -320,6 +350,21 @@ void TreeProbability::findBestSplitValueSmallQ(size_t nodeID, size_t varID, size
 
       // Decrease of impurity
       decrease = sum_right / (double) n_right + sum_left / (double) n_left;
+    }
+    
+    // Stop if class-wise minimal bucket size reached
+    if (min_bucket->size() > 1) {
+      bool stop = false;
+      for (size_t j = 0; j < num_classes; ++j) {
+        size_t class_count_right = class_counts[j] - class_counts_left[j];
+        if (class_counts_left[j] < (*min_bucket)[j] || class_count_right < (*min_bucket)[j]) {
+          stop = true;
+          break;
+        }
+      }
+      if (stop) {
+        continue;
+      }
     }
 
     // Regularization
@@ -379,7 +424,7 @@ void TreeProbability::findBestSplitValueLargeQ(size_t nodeID, size_t varID, size
     }
 
     // Stop if minimal bucket size reached
-    if (n_left < min_bucket || n_right < min_bucket) {
+    if (min_bucket->size() == 1 && (n_left < (*min_bucket)[0] || n_right < (*min_bucket)[0])) {
       continue;
     }
 
@@ -412,6 +457,21 @@ void TreeProbability::findBestSplitValueLargeQ(size_t nodeID, size_t varID, size
 
       // Decrease of impurity
       decrease = sum_right / (double) n_right + sum_left / (double) n_left;
+    }
+    
+    // Stop if class-wise minimal bucket size reached
+    if (min_bucket->size() > 1) {
+      bool stop = false;
+      for (size_t j = 0; j < num_classes; ++j) {
+        size_t class_count_right = class_counts[j] - class_counts_left[j];
+        if (class_counts_left[j] < (*min_bucket)[j] || class_count_right < (*min_bucket)[j]) {
+          stop = true;
+          break;
+        }
+      }
+      if (stop) {
+        continue;
+      }
     }
 
     // Regularization
@@ -490,7 +550,7 @@ void TreeProbability::findBestSplitValueUnordered(size_t nodeID, size_t varID, s
     size_t n_left = num_samples_node - n_right;
 
     // Stop if minimal bucket size reached
-    if (n_left < min_bucket || n_right < min_bucket) {
+    if (min_bucket->size() == 1 && (n_left < (*min_bucket)[0] || n_right < (*min_bucket)[0])) {
       continue;
     }
 
@@ -520,6 +580,21 @@ void TreeProbability::findBestSplitValueUnordered(size_t nodeID, size_t varID, s
       // Decrease of impurity
       decrease = sum_left / (double) n_left + sum_right / (double) n_right;
     }
+    
+    // Stop if class-wise minimal bucket size reached
+    if (min_bucket->size() > 1) {
+      bool stop = false;
+      for (size_t j = 0; j < num_classes; ++j) {
+        size_t class_count_left = class_counts[j] - class_counts_right[j];
+        if (class_count_left < (*min_bucket)[j] || class_counts_right[j] < (*min_bucket)[j]) {
+          stop = true;
+          break;
+        }
+      }
+      if (stop) {
+        continue;
+      }
+    }
 
     // Regularization
     regularize(decrease, varID);
@@ -548,20 +623,40 @@ bool TreeProbability::findBestSplitExtraTrees(size_t nodeID, std::vector<size_t>
     uint sample_classID = (*response_classIDs)[sampleID];
     ++class_counts[sample_classID];
   }
-
-  // Stop early if no split posssible
-  if (num_samples_node >= 2 * min_bucket) {
-
-    // For all possible split variables
-    for (auto& varID : possible_split_varIDs) {
-      // Find best split value, if ordered consider all values as split values, else all 2-partitions
-      if (data->isOrderedVariable(varID)) {
-        findBestSplitValueExtraTrees(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
-            best_decrease);
-      } else {
-        findBestSplitValueExtraTreesUnordered(nodeID, varID, num_classes, class_counts, num_samples_node, best_value,
-            best_varID, best_decrease);
+  
+  // Stop if class-wise minimal node size reached
+  if (min_node_size->size() > 1) {
+    for (size_t j = 0; j < num_classes; ++j) {
+      if (class_counts[j] < (*min_node_size)[j]) {
+        return true;
       }
+    }
+  }
+  
+  // Stop early if no split posssible
+  if (min_bucket->size() == 1) {
+    if (num_samples_node < 2 * (*min_bucket)[0]) {
+      return true;
+    }
+  } else {
+    uint sum_min_bucket = 0;
+    for (size_t j = 0; j < num_classes; ++j) {
+      sum_min_bucket += (*min_bucket)[j];
+    }
+    if (num_samples_node < sum_min_bucket) {
+      return true;
+    } 
+  }
+
+  // For all possible split variables
+  for (auto& varID : possible_split_varIDs) {
+    // Find best split value, if ordered consider all values as split values, else all 2-partitions
+    if (data->isOrderedVariable(varID)) {
+      findBestSplitValueExtraTrees(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
+          best_decrease);
+    } else {
+      findBestSplitValueExtraTreesUnordered(nodeID, varID, num_classes, class_counts, num_samples_node, best_value,
+          best_varID, best_decrease);
     }
   }
 
@@ -661,7 +756,7 @@ void TreeProbability::findBestSplitValueExtraTrees(size_t nodeID, size_t varID, 
     }
 
     // Stop if minimal bucket size reached
-    if (n_left < min_bucket || n_right[i] < min_bucket) {
+    if (min_bucket->size() == 1 && (n_left < (*min_bucket)[0] || n_right[i] < (*min_bucket)[0])) {
       continue;
     }
 
@@ -674,6 +769,21 @@ void TreeProbability::findBestSplitValueExtraTrees(size_t nodeID, size_t varID, 
 
       sum_right += (*class_weights)[j] * class_count_right * class_count_right;
       sum_left += (*class_weights)[j] * class_count_left * class_count_left;
+    }
+    
+    // Stop if class-wise minimal bucket size reached
+    if (min_bucket->size() > 1) {
+      bool stop = false;
+      for (size_t j = 0; j < num_classes; ++j) {
+        size_t class_count_left = class_counts[j] - class_counts_right[j];
+        if (class_count_left < (*min_bucket)[j] || class_counts_right[j] < (*min_bucket)[j]) {
+          stop = true;
+          break;
+        }
+      }
+      if (stop) {
+        continue;
+      }
     }
 
     // Decrease of impurity
@@ -772,7 +882,7 @@ void TreeProbability::findBestSplitValueExtraTreesUnordered(size_t nodeID, size_
     size_t n_left = num_samples_node - n_right;
 
     // Stop if minimal bucket size reached
-    if (n_left < min_bucket || n_right < min_bucket) {
+    if (min_bucket->size() == 1 && (n_left < (*min_bucket)[0] || n_right < (*min_bucket)[0])) {
       continue;
     }
 
@@ -786,6 +896,21 @@ void TreeProbability::findBestSplitValueExtraTreesUnordered(size_t nodeID, size_
       sum_right += (*class_weights)[j] * class_count_right * class_count_right;
       sum_left += (*class_weights)[j] * class_count_left * class_count_left;
     }
+    
+    // Stop if class-wise minimal bucket size reached
+    if (min_bucket->size() > 1) {
+      bool stop = false;
+      for (size_t j = 0; j < num_classes; ++j) {
+        size_t class_count_left = class_counts[j] - class_counts_right[j];
+        if (class_count_left < (*min_bucket)[j] || class_counts_right[j] < (*min_bucket)[j]) {
+          stop = true;
+          break;
+        }
+      }
+      if (stop) {
+        continue;
+      }
+    }
 
     // Decrease of impurity
     double decrease = sum_left / (double) n_left + sum_right / (double) n_right;
@@ -798,6 +923,293 @@ void TreeProbability::findBestSplitValueExtraTreesUnordered(size_t nodeID, size_
       best_value = splitID;
       best_varID = varID;
       best_decrease = decrease;
+    }
+  }
+}
+
+void TreeProbability::findBestSplitValueNanSmallQ(size_t nodeID, size_t varID, size_t num_classes,
+                                               const std::vector<size_t>& class_counts, size_t num_samples_node, double& best_value, size_t& best_varID,
+                                               double& best_decrease) {
+  
+  // Create possible split values
+  std::vector<double> possible_split_values;
+  data->getAllValues(possible_split_values, sampleIDs, varID, start_pos[nodeID], end_pos[nodeID]);
+  
+  // Try next variable if all equal for this
+  if (possible_split_values.size() < 2) {
+    return;
+  }
+  
+  const size_t num_splits = possible_split_values.size();
+  if (memory_saving_splitting) {
+    std::vector<size_t> class_counts_right(num_splits * num_classes), n_right(num_splits);
+    findBestSplitValueSmallQ(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
+                             best_decrease, possible_split_values, class_counts_right, n_right);
+  } else {
+    std::fill_n(counter_per_class.begin(), num_splits * num_classes, 0);
+    std::fill_n(counter.begin(), num_splits, 0);
+    findBestSplitValueSmallQ(nodeID, varID, num_classes, class_counts, num_samples_node, best_value, best_varID,
+                             best_decrease, possible_split_values, counter_per_class, counter);
+  }
+}
+
+void TreeProbability::findBestSplitValueNanSmallQ(size_t nodeID, size_t varID, size_t num_classes,
+                                               const std::vector<size_t>& class_counts, size_t num_samples_node, double& best_value, size_t& best_varID,
+                                               double& best_decrease, const std::vector<double>& possible_split_values, std::vector<size_t>& counter_per_class,
+                                               std::vector<size_t>& counter) {
+  
+  // Counters without NaNs
+  std::vector<size_t> class_counts_nan(num_classes, 0);
+  size_t num_samples_node_nan = 0;
+  
+  size_t last_index = possible_split_values.size() - 1;
+  if (std::isnan(possible_split_values[last_index])) {
+    for (size_t pos = start_pos[nodeID]; pos < end_pos[nodeID]; ++pos) {
+      size_t sampleID = sampleIDs[pos];
+      uint sample_classID = (*response_classIDs)[sampleID];
+      
+      if (std::isnan(data->get_x(sampleID, varID))) {
+        ++num_samples_node_nan;
+        ++class_counts_nan[sample_classID];
+      } else {
+        size_t idx = std::lower_bound(possible_split_values.begin(), possible_split_values.end(),
+                                      data->get_x(sampleID, varID)) - possible_split_values.begin();
+        ++counter_per_class[idx * num_classes + sample_classID];
+        ++counter[idx];
+      }
+    }
+  } else {
+    for (size_t pos = start_pos[nodeID]; pos < end_pos[nodeID]; ++pos) {
+      size_t sampleID = sampleIDs[pos];
+      uint sample_classID = (*response_classIDs)[sampleID];
+      size_t idx = std::lower_bound(possible_split_values.begin(), possible_split_values.end(),
+                                    data->get_x(sampleID, varID)) - possible_split_values.begin();
+      
+      ++counter_per_class[idx * num_classes + sample_classID];
+      ++counter[idx];
+    }
+  }
+  
+  size_t n_left = 0;
+  std::vector<size_t> class_counts_left(num_classes);
+  
+  // Compute decrease of impurity for each split
+  for (size_t i = 0; i < possible_split_values.size() - 1; ++i) {
+    
+    // Stop if nothing here
+    if (counter[i] == 0) {
+      continue;
+    }
+    
+    n_left += counter[i];
+    
+    // Stop if right child empty
+    size_t n_right = num_samples_node - num_samples_node_nan - n_left;
+    if (n_right == 0) {
+      break;
+    }
+    
+    // Stop if minimal bucket size reached
+    if (min_bucket->size() == 1 && (n_left < (*min_bucket)[0] || n_right < (*min_bucket)[0])) {
+      continue;
+    }
+    
+    double decrease;
+    double decrease_nanleft;
+    double decrease_nanright;
+
+    // Sum of squares
+    double sum_left = 0;
+    double sum_right = 0;
+    double sum_left_withnan = 0;
+    double sum_right_withnan = 0;
+    for (size_t j = 0; j < num_classes; ++j) {
+      class_counts_left[j] += counter_per_class[i * num_classes + j];
+      size_t class_count_right = class_counts[j] - class_counts_nan[j] - class_counts_left[j];
+      
+      sum_left += (*class_weights)[j] * class_counts_left[j] * class_counts_left[j];
+      sum_right += (*class_weights)[j] * class_count_right * class_count_right;
+      
+      sum_left_withnan += (*class_weights)[j] * (class_counts_left[j] + class_counts_nan[j]) * (class_counts_left[j] + class_counts_nan[j]);
+      sum_right_withnan += (*class_weights)[j] * (class_count_right + class_counts_nan[j]) * (class_count_right + class_counts_nan[j]);
+    }
+    
+    // Decrease of impurity
+    decrease = sum_right / (double) n_right + sum_left / (double) n_left;
+    decrease_nanleft = sum_right / (double) n_right + sum_left_withnan / (double) (n_left + num_samples_node_nan);
+    decrease_nanright = sum_right_withnan / (double) (n_right + num_samples_node_nan) + sum_left / (double) n_left;
+
+    
+    // Stop if class-wise minimal bucket size reached
+    if (min_bucket->size() > 1) {
+      bool stop = false;
+      for (size_t j = 0; j < num_classes; ++j) {
+        size_t class_count_right = class_counts[j] - class_counts_left[j];
+        if (class_counts_left[j] < (*min_bucket)[j] || class_count_right < (*min_bucket)[j]) {
+          stop = true;
+          break;
+        }
+      }
+      if (stop) {
+        continue;
+      }
+    }
+    
+    // Regularization
+    regularize(decrease, varID);
+    
+    // If better than before, use this
+    if (decrease > best_decrease) {
+      // Use mid-point split
+      best_value = (possible_split_values[i] + possible_split_values[i + 1]) / 2;
+      best_varID = varID;
+      best_decrease = decrease;
+      
+      if (decrease_nanright > decrease_nanleft) {
+        nan_go_right = true;
+      } else {
+        nan_go_right = false;
+      }
+      
+      // Use smaller value if average is numerically the same as the larger value
+      if (best_value == possible_split_values[i + 1]) {
+        best_value = possible_split_values[i];
+      }
+    }
+  }
+}
+
+void TreeProbability::findBestSplitValueNanLargeQ(size_t nodeID, size_t varID, size_t num_classes,
+                                               const std::vector<size_t>& class_counts, size_t num_samples_node, double& best_value, size_t& best_varID,
+                                               double& best_decrease) {
+  
+  // Set counters to 0
+  size_t num_unique = data->getNumUniqueDataValues(varID);
+  std::fill_n(counter_per_class.begin(), num_unique * num_classes, 0);
+  std::fill_n(counter.begin(), num_unique, 0);
+  
+  // Counters without NaNs
+  std::vector<size_t> class_counts_nan(num_classes, 0);
+  size_t num_samples_node_nan = 0;
+  
+  // Count values
+  size_t last_index = data->getNumUniqueDataValues(varID) - 1;
+  if (std::isnan(data->getUniqueDataValue(varID, last_index))) {
+    for (size_t pos = start_pos[nodeID]; pos < end_pos[nodeID]; ++pos) {
+      size_t sampleID = sampleIDs[pos];
+      size_t index = data->getIndex(sampleID, varID);
+      size_t classID = (*response_classIDs)[sampleID];
+      
+      if (index < last_index) {
+        ++counter[index];
+        ++counter_per_class[index * num_classes + classID];
+      } else {
+        ++num_samples_node_nan;
+        ++class_counts_nan[classID];
+      }
+    }
+  } else {
+    for (size_t pos = start_pos[nodeID]; pos < end_pos[nodeID]; ++pos) {
+      size_t sampleID = sampleIDs[pos];
+      size_t index = data->getIndex(sampleID, varID);
+      size_t classID = (*response_classIDs)[sampleID];
+      
+      ++counter[index];
+      ++counter_per_class[index * num_classes + classID];
+    }
+  }
+  
+  
+  size_t n_left = 0;
+  std::vector<size_t> class_counts_left(num_classes);
+  
+  // Compute decrease of impurity for each split
+  for (size_t i = 0; i < num_unique - 1; ++i) {
+    
+    // Stop if nothing here
+    if (counter[i] == 0) {
+      continue;
+    }
+    
+    n_left += counter[i];
+    
+    // Stop if right child empty
+    size_t n_right = num_samples_node - num_samples_node_nan - n_left;
+    if (n_right == 0) {
+      break;
+    }
+    
+    // Stop if minimal bucket size reached
+    if (min_bucket->size() == 1 && (n_left < (*min_bucket)[0] || n_right < (*min_bucket)[0])) {
+      continue;
+    }
+    
+    double decrease;
+    double decrease_nanleft;
+    double decrease_nanright;
+    
+    // Sum of squares
+    double sum_left = 0;
+    double sum_right = 0;
+    double sum_left_withnan = 0;
+    double sum_right_withnan = 0;
+    for (size_t j = 0; j < num_classes; ++j) {
+      class_counts_left[j] += counter_per_class[i * num_classes + j];
+      size_t class_count_right = class_counts[j] - class_counts_nan[j] - class_counts_left[j];
+      
+      sum_left += (*class_weights)[j] * class_counts_left[j] * class_counts_left[j];
+      sum_right += (*class_weights)[j] * class_count_right * class_count_right;
+      
+      sum_left_withnan += (*class_weights)[j] * (class_counts_left[j] + class_counts_nan[j]) * (class_counts_left[j] + class_counts_nan[j]);
+      sum_right_withnan += (*class_weights)[j] * (class_count_right + class_counts_nan[j]) * (class_count_right + class_counts_nan[j]);
+    }
+    
+    // Decrease of impurity
+    decrease = sum_right / (double) n_right + sum_left / (double) n_left;
+    decrease_nanleft = sum_right / (double) n_right + sum_left_withnan / (double) (n_left + num_samples_node_nan);
+    decrease_nanright = sum_right_withnan / (double) (n_right + num_samples_node_nan) + sum_left / (double) n_left;
+
+    // Stop if class-wise minimal bucket size reached
+    if (min_bucket->size() > 1) {
+      bool stop = false;
+      for (size_t j = 0; j < num_classes; ++j) {
+        size_t class_count_right = class_counts[j] - class_counts_left[j];
+        if (class_counts_left[j] < (*min_bucket)[j] || class_count_right < (*min_bucket)[j]) {
+          stop = true;
+          break;
+        }
+      }
+      if (stop) {
+        continue;
+      }
+    }
+    
+    // Regularization
+    regularize(decrease, varID);
+    
+    // If better than before, use this
+    if (decrease > best_decrease) {
+      // Find next value in this node
+      size_t j = i + 1;
+      while (j < num_unique && counter[j] == 0) {
+        ++j;
+      }
+      
+      // Use mid-point split
+      best_value = (data->getUniqueDataValue(varID, i) + data->getUniqueDataValue(varID, j)) / 2;
+      best_varID = varID;
+      best_decrease = decrease;
+      
+      if (decrease_nanright > decrease_nanleft) {
+        nan_go_right = true;
+      } else {
+        nan_go_right = false;
+      }
+      
+      // Use smaller value if average is numerically the same as the larger value
+      if (best_value == data->getUniqueDataValue(varID, j)) {
+        best_value = data->getUniqueDataValue(varID, i);
+      }
     }
   }
 }

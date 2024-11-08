@@ -48,13 +48,13 @@ void ForestRegression::initInternal() {
   }
 
   // Set minimal node size
-  if (min_node_size == 0) {
-    min_node_size = DEFAULT_MIN_NODE_SIZE_REGRESSION;
+  if (min_node_size.size() == 1 && min_node_size[0] == 0) {
+    min_node_size[0] = DEFAULT_MIN_NODE_SIZE_REGRESSION;
   }
 
   // Set minimal bucket size
-  if (min_bucket == 0) {
-    min_bucket = DEFAULT_MIN_BUCKET;
+  if (min_bucket.size() == 1 && min_bucket[0] == 0) {
+    min_bucket[0] = DEFAULT_MIN_BUCKET;
   }
 
   // Error if beta splitrule used with data outside of [0,1]
@@ -64,6 +64,21 @@ void ForestRegression::initInternal() {
       if (y < 0 || y > 1) {
         throw std::runtime_error("Beta splitrule applicable to regression data with outcome between 0 and 1 only.");
       }
+    }
+  }
+  
+  // Error if poisson splitrule used with negative data
+  if (splitrule == POISSON && !prediction_mode) {
+    double y_sum = 0;
+    for (size_t i = 0; i < num_samples; ++i) {
+      double y = data->get_y(i, 0);
+      y_sum += y;
+      if (y < 0) {
+        throw std::runtime_error("Poisson splitrule applicable to regression data with non-positive outcome (y>=0 and sum(y)>0) only.");
+      }
+    }
+    if (y_sum <= 0) {
+      throw std::runtime_error("Poisson splitrule applicable to regression data with non-positive outcome (y>=0 and sum(y)>0) only.");
     }
   }
 

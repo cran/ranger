@@ -12,6 +12,7 @@
 #ifndef UTILITY_H_
 #define UTILITY_H_
 
+#include <math.h>
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -32,6 +33,22 @@
 #include "Data.h"
 
 namespace ranger {
+
+/**
+ * Returns whether first value (a) is less than second value (b). NaN treated as Inf.
+ * @param a First value to compare
+ * @param b Second value to compare
+ */
+template<typename T>
+inline bool less_nan(const T& a, const T& b) {
+  if (std::isnan(a)) {
+    return false;
+  } else if (std::isnan(b)) {
+    return true;
+  } else {
+    return a < b;
+  }
+}
 
 /**
  * Split sequence start..end in num_parts parts with sizes as equal as possible.
@@ -180,7 +197,8 @@ void drawWithoutReplacementSimple(std::vector<size_t>& result, std::mt19937_64& 
     size_t num_samples);
 
 /**
- * Simple algorithm for sampling without replacement (skip values), faster for smaller num_samples
+ * Simple algorithm for sampling without replacement (skip values), faster for smaller num_samples. 
+ * skip values are expected to be sorted in ascending order.
  * @param result Vector to add results to. Will not be cleaned before filling.
  * @param random_number_generator Random number generator
  * @param range_length Length of range. Interval to draw from: 0..max-1
@@ -202,6 +220,7 @@ void drawWithoutReplacementFisherYates(std::vector<size_t>& result, std::mt19937
 
 /**
  * Fisher Yates algorithm for sampling without replacement (skip values).
+ * skip values are expected to be sorted in ascending order.
  * @param result Vector to add results to. Will not be cleaned before filling.
  * @param random_number_generator Random number generator
  * @param max Length of range. Interval to draw from: 0..max-1
@@ -524,6 +543,26 @@ std::stringstream& readFromStream(std::stringstream& in, double& token);
  * @return Log-likelihood
  */
 double betaLogLik(double y, double mean, double phi);
+
+/**
+ * Compute x * log(y) with 0 * log(..) equal to 0.
+ * @param x
+ * @param y
+ * @return x * log(y)
+ */
+inline double xlogy(double x, double y) {
+  if (x == 0) {
+    return 0;
+  } else {
+    return x * log(y);
+  }
+}
+
+/**
+ * Returns the natural logarithm of the absolute value of the gamma function of x.
+ * @param x Parameter for the log-gamma function.
+ */
+double mylgamma(double x);
 
 // User interrupt from R
 #ifdef R_BUILD

@@ -36,6 +36,9 @@
 ##' 
 ##' For classification and \code{predict.all = TRUE}, a factor levels are returned as numerics.
 ##' To retrieve the corresponding factor levels, use \code{rf$forest$levels}, if \code{rf} is the ranger object.
+##' 
+##' By default, ranger uses 2 threads. The default can be changed with: (1) \code{num.threads} in ranger/predict call, (2) environment variable
+##' R_RANGER_NUM_THREADS, (3) \code{options(ranger.num.threads = N)}, (4) \code{options(Ncpus = N)}, with precedence in that order.
 ##'
 ##' @title Ranger prediction
 ##' @param object Ranger \code{ranger.forest} object.
@@ -45,7 +48,7 @@
 ##' @param type Type of prediction. One of 'response', 'se', 'terminalNodes', 'quantiles' with default 'response'. See below for details.
 ##' @param se.method Method to compute standard errors. One of 'jack', 'infjack' with default 'infjack'. Only applicable if type = 'se'. See below for details.
 ##' @param seed Random seed. Default is \code{NULL}, which generates the seed from \code{R}. Set to \code{0} to ignore the \code{R} seed. The seed is used in case of ties in classification mode.
-##' @param num.threads Number of threads. Default is number of CPUs available.
+##' @param num.threads Number of threads. Use 0 for all available cores. Default is 2 if not set by options/environment variables (see below).
 ##' @param verbose Verbose output on or off.
 ##' @param inbag.counts Number of times the observations are in-bag in the trees.
 ##' @param ... further arguments passed to or from other methods.
@@ -103,7 +106,7 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   }
   
   ## Check for old ranger version
-  if (length(forest$child.nodeIDs) != forest$num.trees || length(forest$child.nodeIDs[[1]]) != 2) {
+  if (length(forest$child.nodeIDs) != forest$num.trees || length(forest$child.nodeIDs[[1]]) < 2 || length(forest$child.nodeIDs[[1]]) > 3) {
     stop("Error: Invalid forest object. Is the forest grown in ranger version <0.3.9? Try to predict with the same version the forest was grown.")
   }
   if (!is.null(forest$dependent.varID)) {
@@ -182,18 +185,18 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   if (!is.matrix(x) & !inherits(x, "Matrix")) {
     x <- data.matrix(x)
   }
-
-  ## Check missing values
-  if (any(is.na(x))) {
-    offending_columns <- colnames(x)[colSums(is.na(x)) > 0]
-    stop("Missing data in columns: ",
-         paste0(offending_columns, collapse = ", "), ".", call. = FALSE)
+  
+  ## Missing values
+  if (anyNA(x)) {
+    any.na <- TRUE
+  } else {
+    any.na <- FALSE
   }
 
   ## Num threads
   ## Default 0 -> detect from system in C++.
   if (is.null(num.threads)) {
-    num.threads = 0
+    num.threads <- as.integer(Sys.getenv("R_RANGER_NUM_THREADS", getOption("ranger.num.threads", getOption("Ncpus", 2L))))
   } else if (!is.numeric(num.threads) || num.threads < 0) {
     stop("Error: Invalid value for num.threads")
   }
@@ -234,6 +237,7 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
   splitrule <- 1
   alpha <- 0
   minprop <- 0
+  poisson.tau <- 1
   case.weights <- c(0, 0)
   use.case.weights <- FALSE
   class.weights <- c(0, 0)
@@ -273,11 +277,11 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
                       prediction.mode, forest, snp.data, replace, probability,
                       unordered.factor.variables, use.unordered.factor.variables, save.memory, splitrule,
                       case.weights, use.case.weights, class.weights, 
-                      predict.all, keep.inbag, sample.fraction, alpha, minprop, holdout, 
+                      predict.all, keep.inbag, sample.fraction, alpha, minprop, poisson.tau, holdout, 
                       prediction.type, num.random.splits, sparse.x, use.sparse.data,
                       order.snps, oob.error, max.depth, inbag, use.inbag, 
                       regularization.factor, use.regularization.factor, regularization.usedepth, 
-                      node.stats, time.interest, use.time.interest)
+                      node.stats, time.interest, use.time.interest, any.na)
 
   if (length(result) == 0) {
     stop("User interrupt or internal error.")
@@ -433,6 +437,9 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
 ##' 
 ##' For classification and \code{predict.all = TRUE}, a factor levels are returned as numerics.
 ##' To retrieve the corresponding factor levels, use \code{rf$forest$levels}, if \code{rf} is the ranger object.
+##' 
+##' By default, ranger uses 2 threads. The default can be changed with: (1) \code{num.threads} in ranger/predict call, (2) environment variable
+##' R_RANGER_NUM_THREADS, (3) \code{options(ranger.num.threads = N)}, (4) \code{options(Ncpus = N)}, with precedence in that order.
 ##'
 ##' @title Ranger prediction
 ##' @param object Ranger \code{ranger} object.
@@ -444,7 +451,7 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
 ##' @param quantiles Vector of quantiles for quantile prediction. Set \code{type = 'quantiles'} to use.
 ##' @param what User specified function for quantile prediction used instead of \code{quantile}. Must return numeric vector, see examples.
 ##' @param seed Random seed. Default is \code{NULL}, which generates the seed from \code{R}. Set to \code{0} to ignore the \code{R} seed. The seed is used in case of ties in classification mode.
-##' @param num.threads Number of threads. Default is number of CPUs available.
+##' @param num.threads Number of threads. Use 0 for all available cores. Default is 2 if not set by options/environment variables (see below).
 ##' @param verbose Verbose output on or off.
 ##' @param ... further arguments passed to or from other methods.
 ##' @return Object of class \code{ranger.prediction} with elements

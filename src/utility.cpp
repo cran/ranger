@@ -171,8 +171,8 @@ void drawWithoutReplacementFisherYates(std::vector<size_t>& result, std::mt19937
   std::iota(result.begin(), result.end(), 0);
 
   // Skip indices
-  for (size_t i = 0; i < skip.size(); ++i) {
-    result.erase(result.begin() + skip[i]);
+  for (auto it = skip.rbegin(); it != skip.rend(); it++) {
+    result.erase(result.begin() + *it);
   }
 
   // Draw without replacement using Fisher Yates algorithm
@@ -683,8 +683,20 @@ double betaLogLik(double y, double mean, double phi) {
     phi = 1 - std::numeric_limits<double>::epsilon();
   }
 
-  return (lgamma(phi) - lgamma(mean * phi) - lgamma((1 - mean) * phi) + (mean * phi - 1) * log(y)
-      + ((1 - mean) * phi - 1) * log(1 - y));
+  return (mylgamma(phi) - mylgamma(mean * phi) - mylgamma((1 - mean) * phi) + (mean * phi - 1) * log(y)
+  + ((1 - mean) * phi - 1) * log(1 - y));
+}
+
+double mylgamma(double x) {
+#ifdef WIN_R_BUILD
+  // lgamma_r not available in mingw
+  return(lgamma(x));
+#else
+  int gamma_sign; // Sign for gamma function, not used
+  using namespace std; // Because lgamma_r is sometimes in global namespace, sometimes in std
+  return(lgamma_r(x, &gamma_sign));
+#endif
+
 }
 
 } // namespace ranger
